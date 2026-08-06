@@ -1,4 +1,7 @@
 export type TimestampTimeZone = "UTC" | "local";
+export type MatchFilter = "vct" | "all";
+export type MatchStatus = "upcoming" | "live" | "result";
+export type MatchView = "schedule" | "results";
 
 export interface ExtensionConfig {
   baseUrl: string;
@@ -18,12 +21,16 @@ export interface ExtensionConfig {
   matchPageBaseUrl: string;
   durationMinutes: number;
   timestampTimeZone: TimestampTimeZone;
+  defaultMatchFilter: MatchFilter;
 }
 
 export interface Match {
   id: string | number;
+  status: MatchStatus;
   start: Date;
+  hasStartTime: boolean;
   end: Date | null;
+  timeLabel: string;
   event: string;
   series: string;
   team1: string;
@@ -31,4 +38,8 @@ export interface Match {
   flag1: string;
   flag2: string;
   url: string;
+  score1: string;
+  score2: string;
+  currentMap: string;
+  mapNumber: string;
 }

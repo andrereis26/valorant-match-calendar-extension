@@ -11,15 +11,32 @@
     <header class="topbar">
       <div>
         <p class="eyebrow">VALORANT ESPORTS</p>
-        <h1>Upcoming matches</h1>
+        <h1>Matches</h1>
       </div>
       <button id="settingsButton" class="icon-button" aria-label="Open settings" title="Settings">⚙</button>
     </header>
 
-    <div id="status" class="status" role="status">Loading matches…</div>
+    <div class="view-switch" aria-label="Match view">
+      <button id="scheduleViewButton" class="view-switch-button active" type="button" aria-pressed="true">Schedule</button>
+      <button id="resultsViewButton" class="view-switch-button" type="button" aria-pressed="false">Results</button>
+    </div>
+
+    <div class="summary-row">
+      <div class="segment-control" aria-label="Event filter">
+        <button id="vctFilterButton" class="segment-button active" type="button" aria-pressed="true">VCT</button>
+        <button id="allFilterButton" class="segment-button" type="button" aria-pressed="false">All</button>
+      </div>
+      <div id="status" class="status" role="status">Loading matches...</div>
+    </div>
+
     <section id="matches" class="match-list" aria-live="polite"></section>
 
     <footer>
+      <nav class="pagination" aria-label="Match pages">
+        <button class="page-button active" type="button" data-page="1" aria-current="page">1</button>
+        <button class="page-button" type="button" data-page="2">2</button>
+        <button class="page-button" type="button" data-page="3">3</button>
+      </nav>
       <button id="refreshButton" class="secondary-button">Refresh</button>
     </footer>
   </main>

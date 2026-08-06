@@ -1,18 +1,19 @@
 import type {
   ExtensionConfig,
-  Match
+  Match,
+  MatchStatus
 } from "./types";
 
 /**
  * Default configuration used on first installation.
  *
- * Replace "https://api.your-domain.com" with the public URL
- * of your self-hosted API before publishing the extension.
+ * Replace the local URL with the public URL of your
+ * self-hosted API before publishing the extension.
  *
  * Users can still override every setting through the options page.
  */
 export const DEFAULT_CONFIG: ExtensionConfig = {
-  baseUrl: "http://api.your-domain.com",
+  baseUrl: "http://127.0.0.1:3001",
   endpoint: "/v2/match?q=upcoming",
 
   headers: "{}",
@@ -55,7 +56,10 @@ export const DEFAULT_CONFIG: ExtensionConfig = {
    * Change this later if your endpoint starts returning
    * proper ISO 8601 timestamps.
    */
-  timestampTimeZone: "UTC"
+  timestampTimeZone: "UTC",
+
+  // The popup opens filtered to VCT events unless the user changes this.
+  defaultMatchFilter: "vct"
 };
 
 /**
@@ -113,6 +117,67 @@ export function buildApiUrl(
     .replace(/\/+$/, "");
 
   return `${base}/${route.replace(/^\/+/, "")}`;
+}
+
+type MatchQuery =
+  "upcoming" |
+  "upcoming_extended" |
+  "live_score" |
+  "results";
+
+/**
+ * Reuses the configured match endpoint while replacing only the
+ * query mode and optional API page. This keeps custom base URLs
+ * and path prefixes intact.
+ */
+export function buildMatchEndpoint(
+  endpoint: string,
+  query: MatchQuery,
+  page?: number
+): string {
+  const route = endpoint.trim();
+  const isAbsolute = /^https?:\/\//i.test(route);
+  const url = new URL(
+    route,
+    "https://valorant-match-calendar.local"
+  );
+
+  url.searchParams.set("q", query);
+  url.searchParams.delete("num_pages");
+  url.searchParams.delete("from_page");
+  url.searchParams.delete("to_page");
+
+  if (
+    page !== undefined &&
+    (
+      query === "upcoming_extended" ||
+      query === "results"
+    )
+  ) {
+    const normalizedPage =
+      Math.min(
+        3,
+        Math.max(
+          1,
+          Math.trunc(page)
+        )
+      );
+
+    url.searchParams.set(
+      "from_page",
+      String(normalizedPage)
+    );
+    url.searchParams.set(
+      "to_page",
+      String(normalizedPage)
+    );
+  }
+
+  if (isAbsolute) {
+    return url.href;
+  }
+
+  return `${url.pathname}${url.search}`;
 }
 
 /**
@@ -414,35 +479,20 @@ interface ApiResponseEnvelope {
   message?: unknown;
 }
 
-/**
- * Fetches, maps, filters and sorts upcoming matches.
- */
-export async function fetchMatches(
-  config: ExtensionConfig
-): Promise<Match[]> {
-  /*
-   * A base URL is only optional when endpoint itself is
-   * a complete URL.
-   */
-  if (
-    !config.baseUrl &&
-    !/^https?:\/\//i.test(config.endpoint)
-  ) {
-    throw new Error(
-      "Configure the API base URL in Settings first."
-    );
-  }
+interface FetchMatchesOptions {
+  query?: MatchQuery;
+  page?: number;
+  status?: MatchStatus;
+  includePast?: boolean;
+  sort?: "ascending" | "descending" | "api";
+}
 
-  const url = buildApiUrl(
-    config.baseUrl,
-    config.endpoint
-  );
-
-  let headers: Record<string, string>;
-
+function parseHeaders(
+  headersJson: string
+): Record<string, string> {
   try {
     const parsedHeaders: unknown =
-      JSON.parse(config.headers || "{}");
+      JSON.parse(headersJson || "{}");
 
     if (
       parsedHeaders === null ||
@@ -454,29 +504,17 @@ export async function fetchMatches(
       );
     }
 
-    headers =
-      parsedHeaders as Record<string, string>;
+    return parsedHeaders as Record<string, string>;
   } catch {
     throw new Error(
       "Request headers must be valid JSON."
     );
   }
+}
 
-  const response = await fetch(url, {
-    method: "GET",
-    headers
-  });
-
-  if (!response.ok) {
-    throw new Error(
-      `API request failed ` +
-      `(${response.status} ${response.statusText}).`
-    );
-  }
-
-  const payload: unknown =
-    await response.json();
-
+function validateEnvelope(
+  payload: unknown
+): void {
   /*
    * Validate the status envelope used by the current API.
    *
@@ -488,38 +526,75 @@ export async function fetchMatches(
    * may not return these fields.
    */
   if (
-    payload !== null &&
-    typeof payload === "object"
+    payload === null ||
+    typeof payload !== "object"
   ) {
-    const envelope =
-      payload as ApiResponseEnvelope;
+    return;
+  }
 
-    if (
-      envelope.status !== undefined &&
-      envelope.status !== "success"
-    ) {
-      const message =
-        typeof envelope.message === "string"
-          ? envelope.message
-          : "The match API returned an unsuccessful response.";
+  const envelope =
+    payload as ApiResponseEnvelope;
 
-      throw new Error(message);
-    }
+  if (
+    envelope.status !== undefined &&
+    envelope.status !== "success"
+  ) {
+    const message =
+      typeof envelope.message === "string"
+        ? envelope.message
+        : "The match API returned an unsuccessful response.";
 
-    if (
-      envelope.data?.status !== undefined &&
-      envelope.data.status !== 200
-    ) {
-      const message =
-        typeof envelope.message === "string"
-          ? envelope.message
-          : `The match API returned status ` +
-          `${String(envelope.data.status)}.`;
+    throw new Error(message);
+  }
 
-      throw new Error(message);
+  if (
+    envelope.data?.status !== undefined &&
+    envelope.data.status !== 200
+  ) {
+    const message =
+      typeof envelope.message === "string"
+        ? envelope.message
+        : `The match API returned status ` +
+        `${String(envelope.data.status)}.`;
+
+    throw new Error(message);
+  }
+}
+
+function stringValue(
+  value: unknown,
+  fallback = ""
+): string {
+  if (
+    value === undefined ||
+    value === null
+  ) {
+    return fallback;
+  }
+
+  return String(value);
+}
+
+function firstNonEmptyString(
+  fallback: string,
+  ...values: unknown[]
+): string {
+  for (const value of values) {
+    const text = stringValue(value).trim();
+
+    if (text) {
+      return text;
     }
   }
 
+  return fallback;
+}
+
+function mapPayloadMatches(
+  payload: unknown,
+  config: ExtensionConfig,
+  status: MatchStatus
+): Match[] {
   const rows = getByPath(
     payload,
     config.matchesPath
@@ -528,18 +603,18 @@ export async function fetchMatches(
   if (!Array.isArray(rows)) {
     throw new Error(
       `The matches path ` +
-      `“${config.matchesPath}” ` +
+      `"${config.matchesPath}" ` +
       `did not resolve to an array.`
     );
   }
 
-  const matches = rows
+  return rows
     .map(
       (
         row: unknown,
         index: number
       ): Match | null => {
-        const start = parseDate(
+        const parsedStart = parseDate(
           getByPath(
             row,
             config.startPath
@@ -548,11 +623,17 @@ export async function fetchMatches(
         );
 
         /*
-         * Skip entries without a valid start timestamp.
+         * Schedule rows need a calendar-ready start time. Result
+         * rows can still render with their relative completion label.
          */
-        if (!start) {
+        if (
+          !parsedStart &&
+          status !== "result"
+        ) {
           return null;
         }
+
+        const start = parsedStart ?? new Date();
 
         const end =
           config.endPath
@@ -584,60 +665,83 @@ export async function fetchMatches(
               ? rawId
               : index,
 
+          status,
           start,
+          hasStartTime: parsedStart !== null,
           end,
+          timeLabel: firstNonEmptyString(
+            "",
+            getByPath(row, "time_completed"),
+            getByPath(row, "time_until_match")
+          ),
 
-          event: String(
+          event: firstNonEmptyString(
+            "Valorant pro match",
             getByPath(
               row,
               config.eventPath
-            ) ||
-            "Valorant pro match"
+            ),
+            getByPath(row, "tournament_name")
           ),
 
-          series: String(
+          series: firstNonEmptyString(
+            "",
             getByPath(
               row,
               config.seriesPath
-            ) ||
-            ""
+            ),
+            getByPath(row, "round_info")
           ),
 
-          team1: String(
+          team1: firstNonEmptyString(
+            "TBD",
             getByPath(
               row,
               config.team1Path
-            ) ||
-            "TBD"
+            )
           ),
 
-          team2: String(
+          team2: firstNonEmptyString(
+            "TBD",
             getByPath(
               row,
               config.team2Path
-            ) ||
-            "TBD"
+            )
           ),
 
-          flag1: String(
+          flag1: stringValue(
             getByPath(
               row,
               config.flag1Path
-            ) ||
-            ""
+            )
           ),
 
-          flag2: String(
+          flag2: stringValue(
             getByPath(
               row,
               config.flag2Path
-            ) ||
-            ""
+            )
           ),
 
           url: buildMatchPageUrl(
             rawMatchPage,
             config.matchPageBaseUrl
+          ),
+
+          score1: stringValue(
+            getByPath(row, "score1")
+          ),
+
+          score2: stringValue(
+            getByPath(row, "score2")
+          ),
+
+          currentMap: stringValue(
+            getByPath(row, "current_map")
+          ),
+
+          mapNumber: stringValue(
+            getByPath(row, "map_number")
           )
         };
       }
@@ -645,6 +749,90 @@ export async function fetchMatches(
     .filter(
       (match): match is Match =>
         match !== null
+    );
+}
+
+function sortMatches(
+  matches: Match[],
+  sort: FetchMatchesOptions["sort"]
+): Match[] {
+  if (sort === "api") {
+    return matches;
+  }
+
+  const direction =
+    sort === "descending"
+      ? -1
+      : 1;
+
+  return [...matches].sort(
+    (firstMatch, secondMatch) =>
+      (
+        firstMatch.start.getTime() -
+        secondMatch.start.getTime()
+      ) * direction
+  );
+}
+
+/**
+ * Fetches, maps, filters and sorts matches from the configured API.
+ */
+export async function fetchMatches(
+  config: ExtensionConfig,
+  options: FetchMatchesOptions = {}
+): Promise<Match[]> {
+  /*
+   * A base URL is only optional when endpoint itself is
+   * a complete URL.
+   */
+  if (
+    !config.baseUrl &&
+    !/^https?:\/\//i.test(config.endpoint)
+  ) {
+    throw new Error(
+      "Configure the API base URL in Settings first."
+    );
+  }
+
+  const endpoint =
+    options.query
+      ? buildMatchEndpoint(
+        config.endpoint,
+        options.query,
+        options.page
+      )
+      : config.endpoint;
+
+  const url = buildApiUrl(
+    config.baseUrl,
+    endpoint
+  );
+
+  const headers =
+    parseHeaders(config.headers);
+
+  const response = await fetch(url, {
+    method: "GET",
+    headers
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `API request failed ` +
+      `(${response.status} ${response.statusText}).`
+    );
+  }
+
+  const payload: unknown =
+    await response.json();
+
+  validateEnvelope(payload);
+
+  const matches =
+    mapPayloadMatches(
+      payload,
+      config,
+      options.status ?? "upcoming"
     );
 
   /*
@@ -656,14 +844,16 @@ export async function fetchMatches(
   const now =
     Date.now() - 60_000;
 
-  return matches
-    .filter(
-      match =>
-        match.start.getTime() >= now
-    )
-    .sort(
-      (firstMatch, secondMatch) =>
-        firstMatch.start.getTime() -
-        secondMatch.start.getTime()
-    );
+  const filtered =
+    options.includePast
+      ? matches
+      : matches.filter(
+        match =>
+          match.start.getTime() >= now
+      );
+
+  return sortMatches(
+    filtered,
+    options.sort ?? "ascending"
+  );
 }

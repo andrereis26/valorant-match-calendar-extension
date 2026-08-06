@@ -34,6 +34,8 @@ function readForm(): ExtensionConfig {
       values.durationMinutes = Number(element.value);
     } else if (key === "timestampTimeZone") {
       values.timestampTimeZone = element.value === "local" ? "local" : "UTC";
+    } else if (key === "defaultMatchFilter") {
+      values.defaultMatchFilter = element.value === "all" ? "all" : "vct";
     } else {
       (values as unknown as Record<string, string>)[key] = element.value.trim();
     }

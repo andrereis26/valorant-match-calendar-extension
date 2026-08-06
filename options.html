@@ -10,15 +10,15 @@
   <main class="settings-card">
     <p class="eyebrow">VALORANT MATCH CALENDAR</p>
     <h1>API settings</h1>
-    <p class="muted">Configure the API and tell the extension where each match field lives in the JSON response. Dot paths and array indexes are supported.</p>
+    <p class="muted">The extension starts with the bundled API configuration. You can point it to another compatible API at any time.</p>
 
     <form id="settingsForm">
       <div class="two-column">
         <label>Base URL
-          <input id="baseUrl" type="url" placeholder="https://api.example.com" required>
+          <input id="baseUrl" type="url" placeholder="http://127.0.0.1:3001" required>
         </label>
         <label>Upcoming matches endpoint
-          <input id="endpoint" type="text" placeholder="/matches/upcoming" required>
+          <input id="endpoint" type="text" placeholder="/v2/match?q=upcoming" required>
         </label>
       </div>
 
@@ -28,44 +28,60 @@
 
       <h2>Response mapping</h2>
       <div class="mapping-grid">
-        <label>Matches array path <input id="matchesPath" placeholder="data.matches"></label>
-        <label>Match ID path <input id="idPath" placeholder="id"></label>
-        <label>Start timestamp path <input id="startPath" placeholder="start_time"></label>
-        <label>End timestamp path <input id="endPath" placeholder="end_time"></label>
-        <label>Event/title path <input id="eventPath" placeholder="event.name"></label>
-        <label>Team 1 path <input id="team1Path" placeholder="teams.0.name"></label>
-        <label>Team 2 path <input id="team2Path" placeholder="teams.1.name"></label>
-        <label>Match page URL path <input id="matchUrlPath" placeholder="url"></label>
+        <label>Matches array path <input id="matchesPath" placeholder="data.segments"></label>
+        <label>Match ID path <input id="idPath" placeholder="match_page"></label>
+        <label>Start timestamp path <input id="startPath" placeholder="unix_timestamp"></label>
+        <label>End timestamp path <input id="endPath" placeholder=""></label>
+        <label>Event path <input id="eventPath" placeholder="match_event"></label>
+        <label>Series path <input id="seriesPath" placeholder="match_series"></label>
+        <label>Team 1 path <input id="team1Path" placeholder="team1"></label>
+        <label>Team 2 path <input id="team2Path" placeholder="team2"></label>
+        <label>Team 1 flag path <input id="flag1Path" placeholder="flag1"></label>
+        <label>Team 2 flag path <input id="flag2Path" placeholder="flag2"></label>
+        <label>Match-page path <input id="matchUrlPath" placeholder="match_page"></label>
+        <label>Match-page base URL <input id="matchPageBaseUrl" type="url" placeholder="https://www.vlr.gg"></label>
       </div>
 
-      <label>Default duration when the API has no end time (minutes)
-        <input id="durationMinutes" type="number" min="1" max="1440" value="120">
-      </label>
+      <div class="two-column">
+        <label>Default duration when no end time exists (minutes)
+          <input id="durationMinutes" type="number" min="1" max="1440" value="120">
+        </label>
+        <label>API timestamp timezone
+          <select id="timestampTimeZone">
+            <option value="UTC">UTC</option>
+            <option value="local">User's local timezone</option>
+          </select>
+        </label>
+      </div>
 
       <div class="form-actions">
         <button type="submit" class="primary-button">Save settings</button>
         <button type="button" id="testButton" class="secondary-button">Test connection</button>
+        <button type="button" id="restoreDefaultsButton" class="secondary-button">Restore defaults</button>
       </div>
       <p id="saveStatus" class="status" role="status"></p>
     </form>
 
     <details>
-      <summary>Example API response</summary>
+      <summary>Expected response shape</summary>
       <pre>{
+  "status": "success",
   "data": {
-    "matches": [{
-      "id": "match-123",
-      "start_time": "2026-08-20T18:00:00Z",
-      "end_time": "2026-08-20T20:00:00Z",
-      "event": { "name": "Champions Tour" },
-      "teams": [{ "name": "Team Alpha" }, { "name": "Team Bravo" }],
-      "url": "https://example.com/matches/123"
+    "status": 200,
+    "segments": [{
+      "team1": "Gentle Mates GC",
+      "team2": "ALTERNATE aTTaX Ruby",
+      "flag1": "flag_eu",
+      "flag2": "flag_de",
+      "match_series": "Group Stage: Week 3",
+      "match_event": "Game Changers 2026: EMEA Stage 3",
+      "unix_timestamp": "2026-08-06 18:00:00",
+      "match_page": "716636/example-match"
     }]
   }
 }</pre>
     </details>
   </main>
-  <script src="common.js"></script>
-  <script src="options.js"></script>
+  <script src="dist/options.js"></script>
 </body>
 </html>

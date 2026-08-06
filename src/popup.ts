@@ -108,7 +108,44 @@ function updateControls(): void {
   });
 }
 
+function isSameLocalDate(
+  firstDate: Date,
+  secondDate: Date
+): boolean {
+  return (
+    firstDate.getFullYear() === secondDate.getFullYear() &&
+    firstDate.getMonth() === secondDate.getMonth() &&
+    firstDate.getDate() === secondDate.getDate()
+  );
+}
+
+function formatClockTime(date: Date): string {
+  return new Intl.DateTimeFormat(undefined, {
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(date);
+}
+
+function formatTimeUntil(date: Date): string {
+  const totalMinutes = Math.max(
+    0,
+    Math.ceil(
+      (date.getTime() - Date.now()) / 60_000
+    )
+  );
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  return hours > 0
+    ? `${hours}h${minutes}m`
+    : `${minutes}m`;
+}
+
 function formatMatchDate(date: Date): string {
+  if (isSameLocalDate(date, new Date())) {
+    return `Today, ${formatClockTime(date)} - in ${formatTimeUntil(date)}`;
+  }
+
   return new Intl.DateTimeFormat(undefined, {
     weekday: "short",
     month: "short",
@@ -281,7 +318,7 @@ function matchCard(match: Match, config: ExtensionConfig): HTMLElement {
   article.append(content);
 
   if (
-    match.status !== "result" &&
+    match.status === "upcoming" &&
     match.hasStartTime
   ) {
     const addButton = document.createElement("button");
@@ -329,6 +366,17 @@ async function fetchMatchesForView(config: ExtensionConfig): Promise<Match[]> {
     });
   }
 
+  const upcomingMatchesRequest =
+    fetchMatches(config, {
+      query: "upcoming_extended",
+      page: selectedPage,
+      status: "upcoming"
+    });
+
+  if (selectedPage !== 1) {
+    return upcomingMatchesRequest;
+  }
+
   const [liveMatches, upcomingMatches] = await Promise.all([
     fetchMatches(config, {
       query: "live_score",
@@ -336,11 +384,7 @@ async function fetchMatchesForView(config: ExtensionConfig): Promise<Match[]> {
       includePast: true,
       sort: "api"
     }),
-    fetchMatches(config, {
-      query: "upcoming_extended",
-      page: selectedPage,
-      status: "upcoming"
-    })
+    upcomingMatchesRequest
   ]);
 
   return uniqueMatches([

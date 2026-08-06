@@ -40,6 +40,10 @@ export interface Match {
   url: string;
   score1: string;
   score2: string;
+  team1RoundCt: string;
+  team1RoundT: string;
+  team2RoundCt: string;
+  team2RoundT: string;
   currentMap: string;
   mapNumber: string;
 }

@@ -228,7 +228,8 @@ h1 {
 }
 
 .match-tag,
-.match-score {
+.match-score,
+.round-score {
   flex: 0 0 auto;
   border-radius: 999px;
   font-weight: 900;
@@ -257,6 +258,26 @@ h1 {
   color: #fff;
   font-size: 12px;
 }
+
+.score-stack {
+  display: grid;
+  justify-items: end;
+  flex: 0 0 auto;
+  gap: 4px;
+}
+
+.round-score {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 6px;
+  background: rgba(13, 21, 29, .72);
+  color: #aeb8c2;
+  font-size: 11px;
+}
+
+.round-score-value--ct { color: #45d38a; }
+.round-score-value--t { color: #ff6b76; }
 
 time { color: #aeb8c2; }
 

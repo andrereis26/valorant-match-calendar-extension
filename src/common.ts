@@ -319,6 +319,26 @@ function parseDate(
     : date;
 }
 
+function normalizeMatchTimestamp(
+  date: Date | null
+): Date | null {
+  if (!date) {
+    return null;
+  }
+
+  const normalizedDate = new Date(date);
+
+  if (
+    normalizedDate.getSeconds() > 0 ||
+    normalizedDate.getMilliseconds() > 0
+  ) {
+    normalizedDate.setMinutes(normalizedDate.getMinutes() + 1);
+  }
+
+  normalizedDate.setSeconds(0, 0);
+  return normalizedDate;
+}
+
 /**
  * Builds the complete match-page URL.
  *
@@ -614,13 +634,29 @@ function mapPayloadMatches(
         row: unknown,
         index: number
       ): Match | null => {
-        const parsedStart = parseDate(
-          getByPath(
-            row,
-            config.startPath
-          ),
-          config.timestampTimeZone
-        );
+        const parsedStart =
+          normalizeMatchTimestamp(
+            parseDate(
+              getByPath(
+                row,
+                config.startPath
+              ),
+              config.timestampTimeZone
+            )
+          );
+
+        const parsedEnd =
+          config.endPath
+            ? normalizeMatchTimestamp(
+              parseDate(
+                getByPath(
+                  row,
+                  config.endPath
+                ),
+                config.timestampTimeZone
+              )
+            )
+            : null;
 
         /*
          * Schedule rows need a calendar-ready start time. Result
@@ -635,22 +671,13 @@ function mapPayloadMatches(
 
         const start = parsedStart ?? new Date();
 
-        const end =
-          config.endPath
-            ? parseDate(
-              getByPath(
-                row,
-                config.endPath
-              ),
-              config.timestampTimeZone
-            )
-            : null;
-
         const rawMatchPage =
           getByPath(
             row,
             config.matchUrlPath
           );
+
+        const end = parsedEnd;
 
         const rawId =
           getByPath(
@@ -734,6 +761,22 @@ function mapPayloadMatches(
 
           score2: stringValue(
             getByPath(row, "score2")
+          ),
+
+          team1RoundCt: stringValue(
+            getByPath(row, "team1_round_ct")
+          ),
+
+          team1RoundT: stringValue(
+            getByPath(row, "team1_round_t")
+          ),
+
+          team2RoundCt: stringValue(
+            getByPath(row, "team2_round_ct")
+          ),
+
+          team2RoundT: stringValue(
+            getByPath(row, "team2_round_t")
           ),
 
           currentMap: stringValue(

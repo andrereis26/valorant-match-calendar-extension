@@ -119,6 +119,20 @@ function isSameLocalDate(
   );
 }
 
+function roundedDisplayDate(date: Date): Date {
+  const roundedDate = new Date(date);
+
+  if (
+    roundedDate.getSeconds() > 0 ||
+    roundedDate.getMilliseconds() > 0
+  ) {
+    roundedDate.setMinutes(roundedDate.getMinutes() + 1);
+  }
+
+  roundedDate.setSeconds(0, 0);
+  return roundedDate;
+}
+
 function formatClockTime(date: Date): string {
   return new Intl.DateTimeFormat(undefined, {
     hour: "2-digit",
@@ -142,8 +156,10 @@ function formatTimeUntil(date: Date): string {
 }
 
 function formatMatchDate(date: Date): string {
-  if (isSameLocalDate(date, new Date())) {
-    return `Today, ${formatClockTime(date)} - in ${formatTimeUntil(date)}`;
+  const displayDate = roundedDisplayDate(date);
+
+  if (isSameLocalDate(displayDate, new Date())) {
+    return `Today, ${formatClockTime(displayDate)} - in ${formatTimeUntil(displayDate)}`;
   }
 
   return new Intl.DateTimeFormat(undefined, {
@@ -151,9 +167,8 @@ function formatMatchDate(date: Date): string {
     month: "short",
     day: "numeric",
     hour: "2-digit",
-    minute: "2-digit",
-    timeZoneName: "short"
-  }).format(date);
+    minute: "2-digit"
+  }).format(displayDate);
 }
 
 function flagCodeToEmoji(flag: string): string {
@@ -174,6 +189,81 @@ function formatScore(match: Match): string {
   if (!hasScore(match)) return "";
 
   return `${match.score1 || "0"} - ${match.score2 || "0"}`;
+}
+
+interface RoundScoreValue {
+  value: string;
+  side: "ct" | "t";
+}
+
+function isRoundScoreValue(value: string): boolean {
+  const normalizedValue = value.trim();
+
+  return normalizedValue !== "" && normalizedValue.toUpperCase() !== "N/A";
+}
+
+function roundScoreValue(
+  ctValue: string,
+  tValue: string
+): RoundScoreValue | null {
+  if (isRoundScoreValue(ctValue)) {
+    return {
+      value: ctValue.trim(),
+      side: "ct"
+    };
+  }
+
+  if (isRoundScoreValue(tValue)) {
+    return {
+      value: tValue.trim(),
+      side: "t"
+    };
+  }
+
+  return null;
+}
+
+function liveRoundScore(match: Match): [RoundScoreValue, RoundScoreValue] | null {
+  const team1Score = roundScoreValue(
+    match.team1RoundCt,
+    match.team1RoundT
+  );
+  const team2Score = roundScoreValue(
+    match.team2RoundCt,
+    match.team2RoundT
+  );
+
+  if (!team1Score || !team2Score) {
+    return null;
+  }
+
+  return [team1Score, team2Score];
+}
+
+function roundScoreElement(match: Match): HTMLElement | null {
+  const roundScore = liveRoundScore(match);
+
+  if (!roundScore) {
+    return null;
+  }
+
+  const [team1Score, team2Score] = roundScore;
+  const element = document.createElement("span");
+  element.className = "round-score";
+
+  const team1Value = document.createElement("span");
+  team1Value.className = `round-score-value round-score-value--${team1Score.side}`;
+  team1Value.textContent = team1Score.value;
+
+  const separator = document.createElement("span");
+  separator.textContent = "-";
+
+  const team2Value = document.createElement("span");
+  team2Value.className = `round-score-value round-score-value--${team2Score.side}`;
+  team2Value.textContent = team2Score.value;
+
+  element.append("(", team1Value, separator, team2Value, ")");
+  return element;
 }
 
 function liveDetails(match: Match): string {
@@ -279,10 +369,23 @@ function matchCard(match: Match, config: ExtensionConfig): HTMLElement {
 
   const scoreText = formatScore(match);
   if (scoreText) {
+    const scoreGroup = document.createElement("div");
+    scoreGroup.className = "score-stack";
+
     const score = document.createElement("span");
     score.className = "match-score";
     score.textContent = scoreText;
-    teams.append(score);
+    scoreGroup.append(score);
+
+    if (match.status === "live") {
+      const roundScore = roundScoreElement(match);
+
+      if (roundScore) {
+        scoreGroup.append(roundScore);
+      }
+    }
+
+    teams.append(scoreGroup);
   }
 
   const series = document.createElement("p");

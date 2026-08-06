@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Valorant Matches</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="popup-body">
+  <main class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">VALORANT ESPORTS</p>
+        <h1>Upcoming matches</h1>
+      </div>
+      <button id="settingsButton" class="icon-button" aria-label="Open settings" title="Settings">⚙</button>
+    </header>
+
+    <div id="status" class="status" role="status">Loading matches…</div>
+    <section id="matches" class="match-list" aria-live="polite"></section>
+
+    <footer>
+      <button id="refreshButton" class="secondary-button">Refresh</button>
+    </footer>
+  </main>
+  <script src="common.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

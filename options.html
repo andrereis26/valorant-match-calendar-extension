@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Valorant Match Calendar settings</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="options-body">
+  <main class="settings-card">
+    <p class="eyebrow">VALORANT MATCH CALENDAR</p>
+    <h1>API settings</h1>
+    <p class="muted">Configure the API and tell the extension where each match field lives in the JSON response. Dot paths and array indexes are supported.</p>
+
+    <form id="settingsForm">
+      <div class="two-column">
+        <label>Base URL
+          <input id="baseUrl" type="url" placeholder="https://api.example.com" required>
+        </label>
+        <label>Upcoming matches endpoint
+          <input id="endpoint" type="text" placeholder="/matches/upcoming" required>
+        </label>
+      </div>
+
+      <label>Extra request headers (JSON)
+        <textarea id="headers" rows="4" spellcheck="false" placeholder='{"Authorization":"Bearer YOUR_TOKEN"}'></textarea>
+      </label>
+
+      <h2>Response mapping</h2>
+      <div class="mapping-grid">
+        <label>Matches array path <input id="matchesPath" placeholder="data.matches"></label>
+        <label>Match ID path <input id="idPath" placeholder="id"></label>
+        <label>Start timestamp path <input id="startPath" placeholder="start_time"></label>
+        <label>End timestamp path <input id="endPath" placeholder="end_time"></label>
+        <label>Event/title path <input id="eventPath" placeholder="event.name"></label>
+        <label>Team 1 path <input id="team1Path" placeholder="teams.0.name"></label>
+        <label>Team 2 path <input id="team2Path" placeholder="teams.1.name"></label>
+        <label>Match page URL path <input id="matchUrlPath" placeholder="url"></label>
+      </div>
+
+      <label>Default duration when the API has no end time (minutes)
+        <input id="durationMinutes" type="number" min="1" max="1440" value="120">
+      </label>
+
+      <div class="form-actions">
+        <button type="submit" class="primary-button">Save settings</button>
+        <button type="button" id="testButton" class="secondary-button">Test connection</button>
+      </div>
+      <p id="saveStatus" class="status" role="status"></p>
+    </form>
+
+    <details>
+      <summary>Example API response</summary>
+      <pre>{
+  "data": {
+    "matches": [{
+      "id": "match-123",
+      "start_time": "2026-08-20T18:00:00Z",
+      "end_time": "2026-08-20T20:00:00Z",
+      "event": { "name": "Champions Tour" },
+      "teams": [{ "name": "Team Alpha" }, { "name": "Team Bravo" }],
+      "url": "https://example.com/matches/123"
+    }]
+  }
+}</pre>
+    </details>
+  </main>
+  <script src="common.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>

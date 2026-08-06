@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "Valorant Match Calendar",
+  "version": "1.0.0",
+  "description": "View upcoming professional Valorant matches and add them to Google Calendar.",
+  "permissions": ["storage"],
+  "optional_host_permissions": ["https://*/*", "http://*/*"],
+  "action": {
+    "default_title": "Upcoming Valorant matches",
+    "default_popup": "popup.html"
+  },
+  "options_page": "options.html"
+}

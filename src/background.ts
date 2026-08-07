@@ -4,8 +4,9 @@ import {
   loadActiveMatchFilter,
   loadConfig,
   matchPassesFilter
-} from "./common";
-import type { Match } from "./types";
+} from "./core";
+import type { Match } from "./core/types";
+import { extensionStorage } from "./platform/extension/storage";
 
 const LIVE_ALARM_NAME = "valorant-live-match-check";
 const CHECK_PERIOD_MINUTES = 5;
@@ -80,8 +81,8 @@ async function notifyLiveMatch(
 }
 
 async function testNotification(): Promise<string> {
-  const config = await loadConfig();
-  const filter = await loadActiveMatchFilter(config);
+  const config = await loadConfig(extensionStorage);
+  const filter = await loadActiveMatchFilter(extensionStorage, config);
   const liveMatches = await fetchMatches(config, {
     endpointKey: "live",
     status: "live",
@@ -115,7 +116,7 @@ async function testNotification(): Promise<string> {
 }
 
 async function checkLiveMatches(): Promise<void> {
-  const config = await loadConfig();
+  const config = await loadConfig(extensionStorage);
 
   if (!config.liveNotificationsEnabled) {
     return;
@@ -127,7 +128,7 @@ async function checkLiveMatches(): Promise<void> {
     includePast: true,
     sort: "api"
   });
-  const filter = await loadActiveMatchFilter(config);
+  const filter = await loadActiveMatchFilter(extensionStorage, config);
   const notified = await notifiedIds();
   let changed = false;
 
@@ -153,7 +154,7 @@ async function checkLiveMatches(): Promise<void> {
 }
 
 async function syncLiveAlarm(): Promise<void> {
-  const config = await loadConfig();
+  const config = await loadConfig(extensionStorage);
 
   if (!config.liveNotificationsEnabled) {
     await chrome.alarms.clear(LIVE_ALARM_NAME);

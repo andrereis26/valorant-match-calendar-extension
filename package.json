@@ -3,13 +3,18 @@
   "version": "1.2.0",
   "private": true,
   "scripts": {
-    "build": "esbuild src/popup.ts src/options.ts src/background.ts --bundle --outdir=dist --format=iife --target=chrome120",
-    "typecheck": "tsc --noEmit",
+    "build:extension": "esbuild src/popup.ts src/options.ts src/background.ts --bundle --outdir=dist --format=iife --target=chrome120",
+    "build:pwa": "esbuild src/pwa-app.ts src/pwa-settings.ts --bundle --outdir=dist/pwa --format=iife --target=es2022 && esbuild src/pwa-sw.ts --bundle --outfile=pwa-sw.js --format=iife --target=es2022 && node scripts/build-pwa-site.mjs",
+    "build": "npm run build:extension && npm run build:pwa",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.sw.json",
     "check": "npm run typecheck && npm run build"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.327",
     "esbuild": "^0.25.0",
     "typescript": "^5.8.0"
+  },
+  "allowScripts": {
+    "esbuild@0.25.12": true
   }
 }

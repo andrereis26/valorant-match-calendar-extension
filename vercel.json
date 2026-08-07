@@ -1,0 +1,15 @@
+{
+  "buildCommand": "npm run build:pwa",
+  "outputDirectory": "public",
+  "rewrites": [
+    { "source": "/", "destination": "/pwa-index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/manifest.webmanifest",
+      "headers": [
+        { "key": "Content-Type", "value": "application/manifest+json" }
+      ]
+    }
+  ]
+}

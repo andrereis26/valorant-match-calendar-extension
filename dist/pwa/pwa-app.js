@@ -1032,34 +1032,53 @@
     void renderMatches();
   }
 
-  // src/platform/extension/storage.ts
-  var extensionStorage = {
+  // src/platform/pwa/storage.ts
+  var SYNC_CONFIG_KEY = "vmc:config";
+  var LOCAL_KEY_PREFIX = "vmc:local:";
+  function readJson(key) {
+    const raw = localStorage.getItem(key);
+    if (raw === null) return void 0;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return void 0;
+    }
+  }
+  var pwaStorage = {
     async getSyncConfig() {
-      return chrome.storage.sync.get(null);
+      return readJson(SYNC_CONFIG_KEY) ?? {};
     },
     async setSyncConfig(config) {
-      await chrome.storage.sync.set(config);
+      localStorage.setItem(SYNC_CONFIG_KEY, JSON.stringify(config));
     },
     async getLocalValue(key) {
-      const stored = await chrome.storage.local.get(key);
-      return stored[key];
+      return readJson(`${LOCAL_KEY_PREFIX}${key}`);
     },
     async setLocalValue(key, value) {
-      await chrome.storage.local.set({ [key]: value });
+      localStorage.setItem(`${LOCAL_KEY_PREFIX}${key}`, JSON.stringify(value));
     }
   };
 
-  // src/platform/extension/links.ts
+  // src/platform/pwa/links.ts
   function openLink(url) {
-    void chrome.tabs.create({ url });
+    window.open(url, "_blank", "noopener");
   }
   function openSettings() {
-    void chrome.runtime.openOptionsPage();
+    window.location.href = "pwa-settings.html";
   }
 
-  // src/popup.ts
+  // src/platform/pwa/registerServiceWorker.ts
+  function registerServiceWorker() {
+    if (!("serviceWorker" in navigator)) return;
+    window.addEventListener("load", () => {
+      void navigator.serviceWorker.register("pwa-sw.js");
+    });
+  }
+
+  // src/pwa-app.ts
+  registerServiceWorker();
   mountMatchListView({
-    storage: extensionStorage,
+    storage: pwaStorage,
     openLink,
     openSettings
   });

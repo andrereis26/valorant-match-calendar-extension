@@ -1,2 +1,6 @@
 # Node
 node_modules/
+
+# Generated Vercel deployment bundle (assembled from already-tracked
+# files by scripts/build-pwa-site.mjs; Vercel regenerates it on deploy)
+public/

@@ -17,6 +17,14 @@ button:disabled { cursor: not-allowed; opacity: .65; }
   background: linear-gradient(160deg, #111c27, #0b1118);
 }
 
+.pwa-body {
+  width: 100%;
+  min-height: 100vh;
+  max-width: 480px;
+  margin: 0 auto;
+  background: linear-gradient(160deg, #111c27, #0b1118);
+}
+
 .app-shell { padding: 20px; }
 
 .topbar {

@@ -1,6 +1,11 @@
 "use strict";
 (() => {
   // src/core/config.ts
+  var MATCH_ENDPOINT_KEYS = [
+    "upcoming",
+    "live",
+    "results"
+  ];
   var DEFAULT_MATCH_MAPPING = {
     // The API returns matches inside data.segments.
     matchesPath: "data.segments",
@@ -178,9 +183,6 @@
       )
     };
   }
-  function normalizeMatchFilter(filter) {
-    return filter === "all" ? "all" : "vct";
-  }
 
   // src/core/matches.ts
   function getByPath(value, path) {
@@ -241,6 +243,10 @@
       config.baseUrl,
       endpoint
     );
+  }
+  function originPermissionPattern(urlString) {
+    const url = new URL(urlString);
+    return `${url.protocol}//${url.host}/*`;
   }
   function parseDate(value, timestampTimeZone) {
     if (value === void 0 || value === null || value === "") {
@@ -315,9 +321,6 @@
       return path;
     }
     return `${base}/${path}`;
-  }
-  function matchPassesFilter(match, filter) {
-    return filter === "all" || /\bvct\b/i.test(match.event);
   }
   function parseHeaders(headersJson) {
     try {
@@ -578,203 +581,299 @@
       storedConfig
     );
   }
-  async function loadActiveMatchFilter(storage, config) {
-    const stored = await storage.getLocalValue(
-      ACTIVE_MATCH_FILTER_KEY
-    );
-    return normalizeMatchFilter(
-      stored ?? config.defaultMatchFilter
-    );
+  async function saveConfig(storage, config) {
+    await storage.setSyncConfig(config);
+  }
+  async function saveActiveMatchFilter(storage, filter) {
+    await storage.setLocalValue(ACTIVE_MATCH_FILTER_KEY, filter);
   }
 
-  // src/platform/extension/storage.ts
-  var extensionStorage = {
+  // src/ui/settingsFormView.ts
+  var mappingFields = [
+    "matchesPath",
+    "idPath",
+    "startPath",
+    "endPath",
+    "eventPath",
+    "seriesPath",
+    "team1Path",
+    "team2Path",
+    "flag1Path",
+    "flag2Path",
+    "matchUrlPath",
+    "score1Path",
+    "score2Path",
+    "team1RoundCtPath",
+    "team1RoundTPath",
+    "team2RoundCtPath",
+    "team2RoundTPath",
+    "currentMapPath",
+    "mapNumberPath",
+    "timeLabelPath"
+  ];
+  function requiredElement(selector) {
+    const element = document.querySelector(selector);
+    if (!element) throw new Error(`Missing settings element: ${selector}`);
+    return element;
+  }
+  function fieldId(endpointKey, field) {
+    return `${endpointKey}_${field}`;
+  }
+  function endpointInputId(endpointKey) {
+    return `${endpointKey}_endpoint`;
+  }
+  function mountSettingsFormView(platform) {
+    const form = requiredElement("#settingsForm");
+    const saveStatus = requiredElement("#saveStatus");
+    const testButton = requiredElement("#testButton");
+    const testNotificationButton = requiredElement("#testNotificationButton");
+    const restoreDefaultsButton = requiredElement("#restoreDefaultsButton");
+    const liveNotificationsCheckbox = requiredElement("#liveNotificationsEnabled");
+    if (!platform.supportsLiveNotifications) {
+      testNotificationButton.hidden = true;
+      const notificationField = liveNotificationsCheckbox.closest("label") ?? liveNotificationsCheckbox;
+      notificationField.hidden = true;
+      notificationField.style.display = "none";
+    }
+    function setValue(selector, value) {
+      const element = requiredElement(selector);
+      if (element instanceof HTMLInputElement && element.type === "checkbox") {
+        element.checked = Boolean(value);
+      } else {
+        element.value = String(value);
+      }
+    }
+    async function populate() {
+      const config = await loadConfig(platform.storage);
+      setValue("#baseUrl", config.baseUrl);
+      setValue("#headers", config.headers);
+      setValue("#matchPageBaseUrl", config.matchPageBaseUrl);
+      setValue("#durationMinutes", config.durationMinutes);
+      setValue("#timestampTimeZone", config.timestampTimeZone);
+      setValue("#defaultMatchFilter", config.defaultMatchFilter);
+      setValue("#liveNotificationsEnabled", config.liveNotificationsEnabled);
+      MATCH_ENDPOINT_KEYS.forEach((endpointKey) => {
+        setValue(
+          `#${endpointInputId(endpointKey)}`,
+          config.endpoints[endpointKey].endpoint
+        );
+        mappingFields.forEach((field) => {
+          setValue(
+            `#${fieldId(endpointKey, field)}`,
+            config.endpoints[endpointKey].mapping[field]
+          );
+        });
+      });
+    }
+    function readValue(selector) {
+      return requiredElement(selector).value.trim();
+    }
+    function readCheckbox(selector) {
+      const element = requiredElement(selector);
+      return element.checked;
+    }
+    function readMapping(endpointKey) {
+      const mapping = { ...DEFAULT_CONFIG.endpoints[endpointKey].mapping };
+      mappingFields.forEach((field) => {
+        mapping[field] = readValue(
+          `#${fieldId(endpointKey, field)}`
+        );
+      });
+      return mapping;
+    }
+    function readForm() {
+      return {
+        ...DEFAULT_CONFIG,
+        baseUrl: readValue("#baseUrl"),
+        headers: readValue("#headers"),
+        endpoints: {
+          upcoming: {
+            endpoint: readValue("#upcoming_endpoint"),
+            mapping: readMapping("upcoming")
+          },
+          live: {
+            endpoint: readValue("#live_endpoint"),
+            mapping: readMapping("live")
+          },
+          results: {
+            endpoint: readValue("#results_endpoint"),
+            mapping: readMapping("results")
+          }
+        },
+        matchPageBaseUrl: readValue("#matchPageBaseUrl"),
+        durationMinutes: Number(readValue("#durationMinutes")),
+        timestampTimeZone: readValue("#timestampTimeZone") === "local" ? "local" : "UTC",
+        defaultMatchFilter: readValue("#defaultMatchFilter") === "all" ? "all" : "vct",
+        liveNotificationsEnabled: platform.supportsLiveNotifications && readCheckbox("#liveNotificationsEnabled")
+      };
+    }
+    async function ensureApiPermission(config) {
+      const origins = Array.from(
+        new Set(
+          MATCH_ENDPOINT_KEYS.map(
+            (endpointKey) => originPermissionPattern(
+              buildEndpointApiUrl(config, endpointKey)
+            )
+          )
+        )
+      );
+      await platform.ensureOrigins(origins);
+    }
+    function setStatus(message, isError = false) {
+      saveStatus.className = isError ? "status error" : "status";
+      saveStatus.textContent = message;
+    }
+    function validateConfig(config) {
+      JSON.parse(config.headers || "{}");
+      if (!Number.isFinite(config.durationMinutes) || config.durationMinutes < 1) {
+        throw new Error("Default duration must be at least 1 minute.");
+      }
+    }
+    async function saveConfigForTest(config) {
+      validateConfig(config);
+      await ensureApiPermission(config);
+      await saveConfig(platform.storage, config);
+      await saveActiveMatchFilter(platform.storage, config.defaultMatchFilter);
+    }
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      void (async () => {
+        setStatus("");
+        try {
+          const config = readForm();
+          await saveConfigForTest(config);
+          setStatus("Settings saved.");
+        } catch (error) {
+          setStatus(
+            error instanceof Error ? error.message : "Unexpected error.",
+            true
+          );
+        }
+      })();
+    });
+    if (platform.supportsLiveNotifications) {
+      testNotificationButton.addEventListener("click", () => {
+        void (async () => {
+          setStatus("Sending test notification...");
+          try {
+            const config = readForm();
+            await saveConfigForTest(config);
+            if (!platform.testLiveNotification) {
+              throw new Error("Test notifications are not available.");
+            }
+            const response = await platform.testLiveNotification();
+            if (!response?.ok) {
+              throw new Error(
+                response?.message || "Test notification failed."
+              );
+            }
+            setStatus(response.message);
+          } catch (error) {
+            setStatus(
+              error instanceof Error ? error.message : "Unexpected error.",
+              true
+            );
+          }
+        })();
+      });
+    }
+    testButton.addEventListener("click", () => {
+      void (async () => {
+        setStatus("Testing...");
+        try {
+          const config = readForm();
+          validateConfig(config);
+          await ensureApiPermission(config);
+          const [upcomingMatches, liveMatches, results] = await Promise.all([
+            fetchMatches(config, {
+              endpointKey: "upcoming",
+              page: 1,
+              status: "upcoming"
+            }),
+            fetchMatches(config, {
+              endpointKey: "live",
+              status: "live",
+              includePast: true,
+              sort: "api"
+            }),
+            fetchMatches(config, {
+              endpointKey: "results",
+              page: 1,
+              status: "result",
+              includePast: true,
+              sort: "api"
+            })
+          ]);
+          setStatus(
+            `Connection successful. ${upcomingMatches.length} upcoming, ${liveMatches.length} live, ${results.length} results found.`
+          );
+        } catch (error) {
+          setStatus(
+            error instanceof Error ? error.message : "Unexpected error.",
+            true
+          );
+        }
+      })();
+    });
+    restoreDefaultsButton.addEventListener("click", () => {
+      void (async () => {
+        await saveConfig(platform.storage, DEFAULT_CONFIG);
+        await populate();
+        setStatus("Default API settings restored.");
+      })();
+    });
+    void populate().catch((error) => {
+      setStatus(
+        error instanceof Error ? error.message : "Unexpected error.",
+        true
+      );
+    });
+  }
+
+  // src/platform/pwa/storage.ts
+  var SYNC_CONFIG_KEY = "vmc:config";
+  var LOCAL_KEY_PREFIX = "vmc:local:";
+  function readJson(key) {
+    const raw = localStorage.getItem(key);
+    if (raw === null) return void 0;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return void 0;
+    }
+  }
+  var pwaStorage = {
     async getSyncConfig() {
-      return chrome.storage.sync.get(null);
+      return readJson(SYNC_CONFIG_KEY) ?? {};
     },
     async setSyncConfig(config) {
-      await chrome.storage.sync.set(config);
+      localStorage.setItem(SYNC_CONFIG_KEY, JSON.stringify(config));
     },
     async getLocalValue(key) {
-      const stored = await chrome.storage.local.get(key);
-      return stored[key];
+      return readJson(`${LOCAL_KEY_PREFIX}${key}`);
     },
     async setLocalValue(key, value) {
-      await chrome.storage.local.set({ [key]: value });
+      localStorage.setItem(`${LOCAL_KEY_PREFIX}${key}`, JSON.stringify(value));
     }
   };
 
-  // src/background.ts
-  var LIVE_ALARM_NAME = "valorant-live-match-check";
-  var CHECK_PERIOD_MINUTES = 5;
-  var NOTIFIED_IDS_KEY = "notifiedLiveMatchIds";
-  var NOTIFICATION_URLS_KEY = "liveNotificationUrls";
-  var NOTIFICATION_ICON_URL = chrome.runtime.getURL("icons/icon128.png");
-  function notificationId(match) {
-    return `live-${String(match.id).replace(/[^a-z0-9_-]/gi, "_")}`;
+  // src/platform/pwa/permissions.ts
+  async function ensureOrigins() {
   }
-  function matchKey(match) {
-    return match.url || String(match.id);
-  }
-  async function notifiedIds() {
-    const stored = await chrome.storage.local.get(NOTIFIED_IDS_KEY);
-    const value = stored[NOTIFIED_IDS_KEY];
-    return new Set(
-      Array.isArray(value) ? value.filter((item) => typeof item === "string") : []
-    );
-  }
-  async function saveNotifiedIds(ids) {
-    await chrome.storage.local.set({
-      [NOTIFIED_IDS_KEY]: Array.from(ids).slice(-200)
+
+  // src/platform/pwa/registerServiceWorker.ts
+  function registerServiceWorker() {
+    if (!("serviceWorker" in navigator)) return;
+    window.addEventListener("load", () => {
+      void navigator.serviceWorker.register("pwa-sw.js");
     });
   }
-  async function saveNotificationUrl(id, url) {
-    if (!url) return;
-    const stored = await chrome.storage.local.get(NOTIFICATION_URLS_KEY);
-    const urls = stored[NOTIFICATION_URLS_KEY] && typeof stored[NOTIFICATION_URLS_KEY] === "object" && !Array.isArray(stored[NOTIFICATION_URLS_KEY]) ? stored[NOTIFICATION_URLS_KEY] : {};
-    urls[id] = url;
-    await chrome.storage.local.set({
-      [NOTIFICATION_URLS_KEY]: urls
-    });
-  }
-  async function notifyLiveMatch(match, id = notificationId(match)) {
-    const score = match.score1 || match.score2 ? ` (${match.score1 || "0"}-${match.score2 || "0"})` : "";
-    await chrome.notifications.create(id, {
-      type: "basic",
-      iconUrl: NOTIFICATION_ICON_URL,
-      title: "Valorant match is live",
-      message: `${match.team1} vs ${match.team2}${score}`,
-      contextMessage: match.event || void 0,
-      priority: 1
-    });
-    await saveNotificationUrl(id, match.url);
-  }
-  async function testNotification() {
-    const config = await loadConfig(extensionStorage);
-    const filter = await loadActiveMatchFilter(extensionStorage, config);
-    const liveMatches = await fetchMatches(config, {
-      endpointKey: "live",
-      status: "live",
-      includePast: true,
-      sort: "api"
-    });
-    const match = liveMatches.find(
-      (liveMatch) => matchPassesFilter(liveMatch, filter)
-    );
-    if (match) {
-      await notifyLiveMatch(
-        match,
-        `test-${notificationId(match)}-${Date.now()}`
-      );
-      return `Test notification sent for ${match.team1} vs ${match.team2}.`;
-    }
-    await chrome.notifications.create(`test-live-${Date.now()}`, {
-      type: "basic",
-      iconUrl: NOTIFICATION_ICON_URL,
-      title: "Valorant notification test",
-      message: filter === "vct" ? "Notifications are working. No live VCT match is currently available." : "Notifications are working. No live match is currently available.",
-      priority: 1
-    });
-    return "Test notification sent.";
-  }
-  async function checkLiveMatches() {
-    const config = await loadConfig(extensionStorage);
-    if (!config.liveNotificationsEnabled) {
-      return;
-    }
-    const liveMatches = await fetchMatches(config, {
-      endpointKey: "live",
-      status: "live",
-      includePast: true,
-      sort: "api"
-    });
-    const filter = await loadActiveMatchFilter(extensionStorage, config);
-    const notified = await notifiedIds();
-    let changed = false;
-    for (const match of liveMatches) {
-      if (!matchPassesFilter(match, filter)) {
-        continue;
-      }
-      const key = matchKey(match);
-      if (notified.has(key)) {
-        continue;
-      }
-      notified.add(key);
-      changed = true;
-      await notifyLiveMatch(match);
-    }
-    if (changed) {
-      await saveNotifiedIds(notified);
-    }
-  }
-  async function syncLiveAlarm() {
-    const config = await loadConfig(extensionStorage);
-    if (!config.liveNotificationsEnabled) {
-      await chrome.alarms.clear(LIVE_ALARM_NAME);
-      return;
-    }
-    await chrome.alarms.create(LIVE_ALARM_NAME, {
-      periodInMinutes: CHECK_PERIOD_MINUTES
-    });
-    await checkLiveMatches();
-  }
-  function runLiveCheck() {
-    void checkLiveMatches().catch((error) => {
-      console.warn("Live match notification check failed.", error);
-    });
-  }
-  function runAlarmSync() {
-    void syncLiveAlarm().catch((error) => {
-      console.warn("Live match notification alarm sync failed.", error);
-    });
-  }
-  chrome.runtime.onInstalled.addListener(() => {
-    runAlarmSync();
-  });
-  chrome.runtime.onStartup.addListener(() => {
-    runAlarmSync();
-  });
-  chrome.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName === "sync") {
-      if ("liveNotificationsEnabled" in changes || "endpoints" in changes || "baseUrl" in changes || "headers" in changes) {
-        runAlarmSync();
-      }
-      return;
-    }
-    if (areaName === "local" && ACTIVE_MATCH_FILTER_KEY in changes) {
-      runLiveCheck();
-    }
-  });
-  chrome.alarms.onAlarm.addListener((alarm) => {
-    if (alarm.name === LIVE_ALARM_NAME) {
-      runLiveCheck();
-    }
-  });
-  chrome.notifications.onClicked.addListener((notificationId2) => {
-    void (async () => {
-      const stored = await chrome.storage.local.get(NOTIFICATION_URLS_KEY);
-      const urls = stored[NOTIFICATION_URLS_KEY] && typeof stored[NOTIFICATION_URLS_KEY] === "object" && !Array.isArray(stored[NOTIFICATION_URLS_KEY]) ? stored[NOTIFICATION_URLS_KEY] : {};
-      const url = urls[notificationId2];
-      if (url) {
-        await chrome.tabs.create({ url });
-      }
-    })();
-  });
-  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    if (!message || typeof message !== "object" || message.type !== "test-live-notification") {
-      return false;
-    }
-    void testNotification().then((result) => {
-      sendResponse({
-        ok: true,
-        message: result
-      });
-    }).catch((error) => {
-      sendResponse({
-        ok: false,
-        message: error instanceof Error ? error.message : "Unexpected error."
-      });
-    });
-    return true;
+
+  // src/pwa-settings.ts
+  registerServiceWorker();
+  mountSettingsFormView({
+    storage: pwaStorage,
+    ensureOrigins,
+    supportsLiveNotifications: false
   });
 })();

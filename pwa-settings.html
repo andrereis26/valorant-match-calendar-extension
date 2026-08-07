@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0f1923">
+  <title>Valorant Match Calendar settings</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon128.png">
+  <link rel="apple-touch-icon" href="icons/icon128.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="options-body">
+  <main class="settings-card">
+    <p class="eyebrow">VALORANT MATCH CALENDAR</p>
+    <h1>API settings</h1>
+    <p class="muted">The app starts with the bundled API configuration. You can point it to another compatible API at any time.</p>
+
+    <form id="settingsForm">
+      <div class="two-column">
+        <label>Base URL
+          <input id="baseUrl" type="url" placeholder="http://127.0.0.1:3001" required>
+        </label>
+        <label>Match-page base URL
+          <input id="matchPageBaseUrl" type="url" placeholder="https://www.vlr.gg">
+        </label>
+      </div>
+
+      <label>Extra request headers (JSON)
+        <textarea id="headers" rows="4" spellcheck="false" placeholder='{"Authorization":"Bearer YOUR_TOKEN"}'></textarea>
+      </label>
+
+      <h2>Endpoint settings</h2>
+
+      <details open>
+        <summary>Upcoming matches endpoint</summary>
+        <label>Endpoint
+          <input id="upcoming_endpoint" type="text" placeholder="/v2/match?q=upcoming_extended" required>
+        </label>
+        <div class="mapping-grid">
+          <label>Matches array path <input id="upcoming_matchesPath" placeholder="data.segments"></label>
+          <label>Match ID path <input id="upcoming_idPath" placeholder="match_page"></label>
+          <label>Start timestamp path <input id="upcoming_startPath" placeholder="unix_timestamp"></label>
+          <label>End timestamp path <input id="upcoming_endPath" placeholder=""></label>
+          <label>Event path <input id="upcoming_eventPath" placeholder="match_event"></label>
+          <label>Series path <input id="upcoming_seriesPath" placeholder="match_series"></label>
+          <label>Team 1 path <input id="upcoming_team1Path" placeholder="team1"></label>
+          <label>Team 2 path <input id="upcoming_team2Path" placeholder="team2"></label>
+          <label>Team 1 flag path <input id="upcoming_flag1Path" placeholder="flag1"></label>
+          <label>Team 2 flag path <input id="upcoming_flag2Path" placeholder="flag2"></label>
+          <label>Match-page path <input id="upcoming_matchUrlPath" placeholder="match_page"></label>
+          <label>Score 1 path <input id="upcoming_score1Path" placeholder="score1"></label>
+          <label>Score 2 path <input id="upcoming_score2Path" placeholder="score2"></label>
+          <label>Team 1 CT rounds path <input id="upcoming_team1RoundCtPath" placeholder="team1_round_ct"></label>
+          <label>Team 1 T rounds path <input id="upcoming_team1RoundTPath" placeholder="team1_round_t"></label>
+          <label>Team 2 CT rounds path <input id="upcoming_team2RoundCtPath" placeholder="team2_round_ct"></label>
+          <label>Team 2 T rounds path <input id="upcoming_team2RoundTPath" placeholder="team2_round_t"></label>
+          <label>Current map path <input id="upcoming_currentMapPath" placeholder="current_map"></label>
+          <label>Map number path <input id="upcoming_mapNumberPath" placeholder="map_number"></label>
+          <label>Time label path <input id="upcoming_timeLabelPath" placeholder="time_until_match"></label>
+        </div>
+      </details>
+
+      <details>
+        <summary>Live matches endpoint</summary>
+        <label>Endpoint
+          <input id="live_endpoint" type="text" placeholder="/v2/match?q=live_score" required>
+        </label>
+        <div class="mapping-grid">
+          <label>Matches array path <input id="live_matchesPath" placeholder="data.segments"></label>
+          <label>Match ID path <input id="live_idPath" placeholder="match_page"></label>
+          <label>Start timestamp path <input id="live_startPath" placeholder="unix_timestamp"></label>
+          <label>End timestamp path <input id="live_endPath" placeholder=""></label>
+          <label>Event path <input id="live_eventPath" placeholder="match_event"></label>
+          <label>Series path <input id="live_seriesPath" placeholder="match_series"></label>
+          <label>Team 1 path <input id="live_team1Path" placeholder="team1"></label>
+          <label>Team 2 path <input id="live_team2Path" placeholder="team2"></label>
+          <label>Team 1 flag path <input id="live_flag1Path" placeholder="flag1"></label>
+          <label>Team 2 flag path <input id="live_flag2Path" placeholder="flag2"></label>
+          <label>Match-page path <input id="live_matchUrlPath" placeholder="match_page"></label>
+          <label>Score 1 path <input id="live_score1Path" placeholder="score1"></label>
+          <label>Score 2 path <input id="live_score2Path" placeholder="score2"></label>
+          <label>Team 1 CT rounds path <input id="live_team1RoundCtPath" placeholder="team1_round_ct"></label>
+          <label>Team 1 T rounds path <input id="live_team1RoundTPath" placeholder="team1_round_t"></label>
+          <label>Team 2 CT rounds path <input id="live_team2RoundCtPath" placeholder="team2_round_ct"></label>
+          <label>Team 2 T rounds path <input id="live_team2RoundTPath" placeholder="team2_round_t"></label>
+          <label>Current map path <input id="live_currentMapPath" placeholder="current_map"></label>
+          <label>Map number path <input id="live_mapNumberPath" placeholder="map_number"></label>
+          <label>Time label path <input id="live_timeLabelPath" placeholder="time_until_match"></label>
+        </div>
+      </details>
+
+      <details>
+        <summary>Results endpoint</summary>
+        <label>Endpoint
+          <input id="results_endpoint" type="text" placeholder="/v2/match?q=results" required>
+        </label>
+        <div class="mapping-grid">
+          <label>Matches array path <input id="results_matchesPath" placeholder="data.segments"></label>
+          <label>Match ID path <input id="results_idPath" placeholder="match_page"></label>
+          <label>Start timestamp path <input id="results_startPath" placeholder=""></label>
+          <label>End timestamp path <input id="results_endPath" placeholder=""></label>
+          <label>Event path <input id="results_eventPath" placeholder="tournament_name"></label>
+          <label>Series path <input id="results_seriesPath" placeholder="round_info"></label>
+          <label>Team 1 path <input id="results_team1Path" placeholder="team1"></label>
+          <label>Team 2 path <input id="results_team2Path" placeholder="team2"></label>
+          <label>Team 1 flag path <input id="results_flag1Path" placeholder="flag1"></label>
+          <label>Team 2 flag path <input id="results_flag2Path" placeholder="flag2"></label>
+          <label>Match-page path <input id="results_matchUrlPath" placeholder="match_page"></label>
+          <label>Score 1 path <input id="results_score1Path" placeholder="score1"></label>
+          <label>Score 2 path <input id="results_score2Path" placeholder="score2"></label>
+          <label>Team 1 CT rounds path <input id="results_team1RoundCtPath" placeholder="team1_round_ct"></label>
+          <label>Team 1 T rounds path <input id="results_team1RoundTPath" placeholder="team1_round_t"></label>
+          <label>Team 2 CT rounds path <input id="results_team2RoundCtPath" placeholder="team2_round_ct"></label>
+          <label>Team 2 T rounds path <input id="results_team2RoundTPath" placeholder="team2_round_t"></label>
+          <label>Current map path <input id="results_currentMapPath" placeholder="current_map"></label>
+          <label>Map number path <input id="results_mapNumberPath" placeholder="map_number"></label>
+          <label>Time label path <input id="results_timeLabelPath" placeholder="time_completed"></label>
+        </div>
+      </details>
+
+      <div class="two-column">
+        <label>Default duration when no end time exists (minutes)
+          <input id="durationMinutes" type="number" min="1" max="1440" value="120">
+        </label>
+        <label>API timestamp timezone
+          <select id="timestampTimeZone">
+            <option value="UTC">UTC</option>
+            <option value="local">User's local timezone</option>
+          </select>
+        </label>
+      </div>
+
+      <h2>App defaults</h2>
+      <div class="two-column">
+        <label>Initial event filter
+          <select id="defaultMatchFilter">
+            <option value="vct">VCT</option>
+            <option value="all">All</option>
+          </select>
+        </label>
+        <label class="checkbox-label">
+          <input id="liveNotificationsEnabled" type="checkbox">
+          Notify when a new live game appears
+        </label>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="primary-button">Save settings</button>
+        <button type="button" id="testButton" class="secondary-button">Test connection</button>
+        <button type="button" id="testNotificationButton" class="secondary-button">Test notification</button>
+        <button type="button" id="restoreDefaultsButton" class="secondary-button">Restore defaults</button>
+      </div>
+      <p id="saveStatus" class="status" role="status"></p>
+    </form>
+  </main>
+  <script src="dist/pwa/pwa-settings.js"></script>
+</body>
+</html>

@@ -5,3 +5,7 @@ export function openLink(url: string): void {
 export function openSettings(): void {
   window.location.href = "pwa-settings.html";
 }
+
+export function openMatchList(): void {
+  window.location.href = "pwa-index.html";
+}

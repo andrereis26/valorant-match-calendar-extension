@@ -629,6 +629,14 @@
     const testNotificationButton = requiredElement("#testNotificationButton");
     const restoreDefaultsButton = requiredElement("#restoreDefaultsButton");
     const liveNotificationsCheckbox = requiredElement("#liveNotificationsEnabled");
+    const backButton = document.querySelector("#backButton");
+    if (backButton) {
+      if (platform.onBack) {
+        backButton.addEventListener("click", () => platform.onBack());
+      } else {
+        backButton.hidden = true;
+      }
+    }
     if (!platform.supportsLiveNotifications) {
       testNotificationButton.hidden = true;
       const notificationField = liveNotificationsCheckbox.closest("label") ?? liveNotificationsCheckbox;

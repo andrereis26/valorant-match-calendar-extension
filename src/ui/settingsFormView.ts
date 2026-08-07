@@ -46,6 +46,14 @@ export interface SettingsFormPlatform {
   supportsLiveNotifications: boolean;
 
   testLiveNotification?(): Promise<TestNotificationResponse>;
+
+  /**
+   * Navigates back to the match list. Only the PWA's settings page has
+   * a #backButton element in its markup (it's reached by an in-app page
+   * navigation); the extension's options page opens as its own browser
+   * tab, where "back" isn't a meaningful action, so it has none.
+   */
+  onBack?(): void;
 }
 
 const mappingFields: Array<keyof MatchResponseMapping> = [
@@ -97,6 +105,15 @@ export function mountSettingsFormView(platform: SettingsFormPlatform): void {
   const testNotificationButton = requiredElement<HTMLButtonElement>("#testNotificationButton");
   const restoreDefaultsButton = requiredElement<HTMLButtonElement>("#restoreDefaultsButton");
   const liveNotificationsCheckbox = requiredElement<HTMLInputElement>("#liveNotificationsEnabled");
+  const backButton = document.querySelector<HTMLButtonElement>("#backButton");
+
+  if (backButton) {
+    if (platform.onBack) {
+      backButton.addEventListener("click", () => platform.onBack!());
+    } else {
+      backButton.hidden = true;
+    }
+  }
 
   if (!platform.supportsLiveNotifications) {
     testNotificationButton.hidden = true;

@@ -151,12 +151,9 @@ nothing to keep in sync by hand. A rewrite sends `/` to
 
 To deploy:
 
-1. **Vercel CLI** — run `npx vercel` from the project root, follow the
+- **Vercel CLI** — run `npx vercel` from the project root, follow the
    prompts to log in and link a project, then `npx vercel --prod` to
    ship. Vercel reads `vercel.json` automatically.
-2. **GitHub integration** — push this repo to GitHub, then
-   [import it in the Vercel dashboard](https://vercel.com/new). Every
-   push to the connected branch redeploys automatically.
 
 Either way, Vercel serves over HTTPS by default, which the service
 worker requires.

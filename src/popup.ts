@@ -461,7 +461,7 @@ function uniqueMatches(matches: Match[]): Match[] {
 async function fetchMatchesForView(config: ExtensionConfig): Promise<Match[]> {
   if (selectedView === "results") {
     return fetchMatches(config, {
-      query: "results",
+      endpointKey: "results",
       page: selectedPage,
       status: "result",
       includePast: true,
@@ -471,7 +471,7 @@ async function fetchMatchesForView(config: ExtensionConfig): Promise<Match[]> {
 
   const upcomingMatchesRequest =
     fetchMatches(config, {
-      query: "upcoming_extended",
+      endpointKey: "upcoming",
       page: selectedPage,
       status: "upcoming"
     });
@@ -482,7 +482,7 @@ async function fetchMatchesForView(config: ExtensionConfig): Promise<Match[]> {
 
   const [liveMatches, upcomingMatches] = await Promise.all([
     fetchMatches(config, {
-      query: "live_score",
+      endpointKey: "live",
       status: "live",
       includePast: true,
       sort: "api"

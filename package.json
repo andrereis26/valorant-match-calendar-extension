@@ -3,7 +3,7 @@
   "version": "1.2.0",
   "private": true,
   "scripts": {
-    "build": "esbuild src/popup.ts src/options.ts --bundle --outdir=dist --format=iife --target=chrome120",
+    "build": "esbuild src/popup.ts src/options.ts src/background.ts --bundle --outdir=dist --format=iife --target=chrome120",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm run build"
   },

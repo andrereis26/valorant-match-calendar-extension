@@ -1,52 +1,167 @@
 import {
   DEFAULT_CONFIG,
-  buildApiUrl,
+  MATCH_ENDPOINT_KEYS,
+  buildEndpointApiUrl,
   fetchMatches,
   loadConfig,
   originPermissionPattern
 } from "./common";
-import type { ExtensionConfig } from "./types";
+import type {
+  ExtensionConfig,
+  MatchEndpointKey,
+  MatchResponseMapping
+} from "./types";
 
 type ConfigFormElement = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
 
-const fields = Object.keys(DEFAULT_CONFIG) as Array<keyof ExtensionConfig>;
+const mappingFields: Array<keyof MatchResponseMapping> = [
+  "matchesPath",
+  "idPath",
+  "startPath",
+  "endPath",
+  "eventPath",
+  "seriesPath",
+  "team1Path",
+  "team2Path",
+  "flag1Path",
+  "flag2Path",
+  "matchUrlPath",
+  "score1Path",
+  "score2Path",
+  "team1RoundCtPath",
+  "team1RoundTPath",
+  "team2RoundCtPath",
+  "team2RoundTPath",
+  "currentMapPath",
+  "mapNumberPath",
+  "timeLabelPath"
+];
+
 const form = document.querySelector<HTMLFormElement>("#settingsForm")!;
 const saveStatus = document.querySelector<HTMLElement>("#saveStatus")!;
 const testButton = document.querySelector<HTMLButtonElement>("#testButton")!;
 const restoreDefaultsButton = document.querySelector<HTMLButtonElement>("#restoreDefaultsButton")!;
 
+function requiredElement<T extends Element>(selector: string): T {
+  const element = document.querySelector<T>(selector);
+  if (!element) throw new Error(`Missing settings element: ${selector}`);
+  return element;
+}
+
+function fieldId(
+  endpointKey: MatchEndpointKey,
+  field: keyof MatchResponseMapping
+): string {
+  return `${endpointKey}_${field}`;
+}
+
+function endpointInputId(
+  endpointKey: MatchEndpointKey
+): string {
+  return `${endpointKey}_endpoint`;
+}
+
+function setValue(
+  selector: string,
+  value: string | number | boolean
+): void {
+  const element = requiredElement<ConfigFormElement>(selector);
+
+  if (element instanceof HTMLInputElement && element.type === "checkbox") {
+    element.checked = Boolean(value);
+  } else {
+    element.value = String(value);
+  }
+}
+
 async function populate(): Promise<void> {
   const config = await loadConfig();
-  fields.forEach(key => {
-    const element = document.querySelector<ConfigFormElement>(`#${key}`);
-    if (element) element.value = String(config[key]);
+
+  setValue("#baseUrl", config.baseUrl);
+  setValue("#headers", config.headers);
+  setValue("#matchPageBaseUrl", config.matchPageBaseUrl);
+  setValue("#durationMinutes", config.durationMinutes);
+  setValue("#timestampTimeZone", config.timestampTimeZone);
+  setValue("#defaultMatchFilter", config.defaultMatchFilter);
+  setValue("#liveNotificationsEnabled", config.liveNotificationsEnabled);
+
+  MATCH_ENDPOINT_KEYS.forEach(endpointKey => {
+    setValue(
+      `#${endpointInputId(endpointKey)}`,
+      config.endpoints[endpointKey].endpoint
+    );
+
+    mappingFields.forEach(field => {
+      setValue(
+        `#${fieldId(endpointKey, field)}`,
+        config.endpoints[endpointKey].mapping[field]
+      );
+    });
   });
+}
+
+function readValue(selector: string): string {
+  return requiredElement<ConfigFormElement>(selector).value.trim();
+}
+
+function readCheckbox(selector: string): boolean {
+  const element = requiredElement<HTMLInputElement>(selector);
+  return element.checked;
+}
+
+function readMapping(endpointKey: MatchEndpointKey): MatchResponseMapping {
+  const mapping = { ...DEFAULT_CONFIG.endpoints[endpointKey].mapping };
+
+  mappingFields.forEach(field => {
+    mapping[field] = readValue(
+      `#${fieldId(endpointKey, field)}`
+    );
+  });
+
+  return mapping;
 }
 
 function readForm(): ExtensionConfig {
-  const values: ExtensionConfig = { ...DEFAULT_CONFIG };
-
-  fields.forEach(key => {
-    const element = document.querySelector<ConfigFormElement>(`#${key}`);
-    if (!element) return;
-
-    if (key === "durationMinutes") {
-      values.durationMinutes = Number(element.value);
-    } else if (key === "timestampTimeZone") {
-      values.timestampTimeZone = element.value === "local" ? "local" : "UTC";
-    } else if (key === "defaultMatchFilter") {
-      values.defaultMatchFilter = element.value === "all" ? "all" : "vct";
-    } else {
-      (values as unknown as Record<string, string>)[key] = element.value.trim();
-    }
-  });
-
-  return values;
+  return {
+    ...DEFAULT_CONFIG,
+    baseUrl: readValue("#baseUrl"),
+    headers: readValue("#headers"),
+    endpoints: {
+      upcoming: {
+        endpoint: readValue("#upcoming_endpoint"),
+        mapping: readMapping("upcoming")
+      },
+      live: {
+        endpoint: readValue("#live_endpoint"),
+        mapping: readMapping("live")
+      },
+      results: {
+        endpoint: readValue("#results_endpoint"),
+        mapping: readMapping("results")
+      }
+    },
+    matchPageBaseUrl: readValue("#matchPageBaseUrl"),
+    durationMinutes: Number(readValue("#durationMinutes")),
+    timestampTimeZone: readValue("#timestampTimeZone") === "local"
+      ? "local"
+      : "UTC",
+    defaultMatchFilter: readValue("#defaultMatchFilter") === "all"
+      ? "all"
+      : "vct",
+    liveNotificationsEnabled: readCheckbox("#liveNotificationsEnabled")
+  };
 }
 
 async function ensureApiPermission(config: ExtensionConfig): Promise<void> {
-  const apiUrl = buildApiUrl(config.baseUrl, config.endpoint);
-  const origins = [originPermissionPattern(apiUrl)];
+  const origins = Array.from(
+    new Set(
+      MATCH_ENDPOINT_KEYS.map(endpointKey =>
+        originPermissionPattern(
+          buildEndpointApiUrl(config, endpointKey)
+        )
+      )
+    )
+  );
 
   if (await chrome.permissions.contains({ origins })) return;
 
@@ -54,38 +169,84 @@ async function ensureApiPermission(config: ExtensionConfig): Promise<void> {
   if (!granted) throw new Error("API host access was not granted.");
 }
 
+function setStatus(
+  message: string,
+  isError = false
+): void {
+  saveStatus.className = isError ? "status error" : "status";
+  saveStatus.textContent = message;
+}
+
+function validateConfig(config: ExtensionConfig): void {
+  JSON.parse(config.headers || "{}");
+
+  if (
+    !Number.isFinite(config.durationMinutes) ||
+    config.durationMinutes < 1
+  ) {
+    throw new Error("Default duration must be at least 1 minute.");
+  }
+}
+
 form.addEventListener("submit", event => {
   event.preventDefault();
   void (async () => {
-    saveStatus.className = "status";
+    setStatus("");
 
     try {
       const config = readForm();
-      JSON.parse(config.headers || "{}");
+      validateConfig(config);
       await ensureApiPermission(config);
       await chrome.storage.sync.set(config);
-      saveStatus.textContent = "Settings saved.";
+      setStatus("Settings saved.");
     } catch (error: unknown) {
-      saveStatus.className = "status error";
-      saveStatus.textContent = error instanceof Error ? error.message : "Unexpected error.";
+      setStatus(
+        error instanceof Error ? error.message : "Unexpected error.",
+        true
+      );
     }
   })();
 });
 
 testButton.addEventListener("click", () => {
   void (async () => {
-    saveStatus.className = "status";
-    saveStatus.textContent = "Testing…";
+    setStatus("Testing...");
 
     try {
       const config = readForm();
-      JSON.parse(config.headers || "{}");
+      validateConfig(config);
       await ensureApiPermission(config);
-      const matches = await fetchMatches(config);
-      saveStatus.textContent = `Connection successful. ${matches.length} upcoming match${matches.length === 1 ? "" : "es"} found.`;
+
+      const [upcomingMatches, liveMatches, results] = await Promise.all([
+        fetchMatches(config, {
+          endpointKey: "upcoming",
+          page: 1,
+          status: "upcoming"
+        }),
+        fetchMatches(config, {
+          endpointKey: "live",
+          status: "live",
+          includePast: true,
+          sort: "api"
+        }),
+        fetchMatches(config, {
+          endpointKey: "results",
+          page: 1,
+          status: "result",
+          includePast: true,
+          sort: "api"
+        })
+      ]);
+
+      setStatus(
+        `Connection successful. ${upcomingMatches.length} upcoming, ` +
+        `${liveMatches.length} live, ${results.length} results found.`
+      );
     } catch (error: unknown) {
-      saveStatus.className = "status error";
-      saveStatus.textContent = error instanceof Error ? error.message : "Unexpected error.";
+      setStatus(
+        error instanceof Error ? error.message : "Unexpected error.",
+        true
+      );
     }
   })();
 });
@@ -94,9 +255,13 @@ restoreDefaultsButton.addEventListener("click", () => {
   void (async () => {
     await chrome.storage.sync.set(DEFAULT_CONFIG);
     await populate();
-    saveStatus.className = "status";
-    saveStatus.textContent = "Default API settings restored.";
+    setStatus("Default API settings restored.");
   })();
 });
 
-void populate();
+void populate().catch((error: unknown) => {
+  setStatus(
+    error instanceof Error ? error.message : "Unexpected error.",
+    true
+  );
+});

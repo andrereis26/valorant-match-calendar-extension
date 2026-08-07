@@ -1,12 +1,10 @@
 export type TimestampTimeZone = "UTC" | "local";
 export type MatchFilter = "vct" | "all";
+export type MatchEndpointKey = "upcoming" | "live" | "results";
 export type MatchStatus = "upcoming" | "live" | "result";
 export type MatchView = "schedule" | "results";
 
-export interface ExtensionConfig {
-  baseUrl: string;
-  endpoint: string;
-  headers: string;
+export interface MatchResponseMapping {
   matchesPath: string;
   idPath: string;
   startPath: string;
@@ -18,10 +16,31 @@ export interface ExtensionConfig {
   flag1Path: string;
   flag2Path: string;
   matchUrlPath: string;
+  score1Path: string;
+  score2Path: string;
+  team1RoundCtPath: string;
+  team1RoundTPath: string;
+  team2RoundCtPath: string;
+  team2RoundTPath: string;
+  currentMapPath: string;
+  mapNumberPath: string;
+  timeLabelPath: string;
+}
+
+export interface MatchEndpointConfig {
+  endpoint: string;
+  mapping: MatchResponseMapping;
+}
+
+export interface ExtensionConfig {
+  baseUrl: string;
+  headers: string;
+  endpoints: Record<MatchEndpointKey, MatchEndpointConfig>;
   matchPageBaseUrl: string;
   durationMinutes: number;
   timestampTimeZone: TimestampTimeZone;
   defaultMatchFilter: MatchFilter;
+  liveNotificationsEnabled: boolean;
 }
 
 export interface Match {

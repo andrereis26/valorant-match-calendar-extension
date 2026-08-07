@@ -373,6 +373,12 @@ label {
   font-weight: 700;
 }
 
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 input,
 textarea,
 select {
@@ -383,6 +389,12 @@ select {
   color: #fff;
   padding: 10px 11px;
   outline: none;
+}
+
+input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #ff4655;
 }
 
 input:focus,

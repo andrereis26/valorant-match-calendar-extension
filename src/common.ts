@@ -1,23 +1,18 @@
 import type {
   ExtensionConfig,
+  MatchEndpointKey,
+  MatchResponseMapping,
   Match,
   MatchStatus
 } from "./types";
 
-/**
- * Default configuration used on first installation.
- *
- * Replace the local URL with the public URL of your
- * self-hosted API before publishing the extension.
- *
- * Users can still override every setting through the options page.
- */
-export const DEFAULT_CONFIG: ExtensionConfig = {
-  baseUrl: "http://127.0.0.1:3001",
-  endpoint: "/v2/match?q=upcoming",
+export const MATCH_ENDPOINT_KEYS: MatchEndpointKey[] = [
+  "upcoming",
+  "live",
+  "results"
+];
 
-  headers: "{}",
-
+const DEFAULT_MATCH_MAPPING: MatchResponseMapping = {
   // The API returns matches inside data.segments.
   matchesPath: "data.segments",
 
@@ -25,8 +20,6 @@ export const DEFAULT_CONFIG: ExtensionConfig = {
   idPath: "match_page",
 
   startPath: "unix_timestamp",
-
-  // The current API response does not provide an end timestamp.
   endPath: "",
 
   eventPath: "match_event",
@@ -39,6 +32,55 @@ export const DEFAULT_CONFIG: ExtensionConfig = {
   flag2Path: "flag2",
 
   matchUrlPath: "match_page",
+
+  score1Path: "score1",
+  score2Path: "score2",
+
+  team1RoundCtPath: "team1_round_ct",
+  team1RoundTPath: "team1_round_t",
+  team2RoundCtPath: "team2_round_ct",
+  team2RoundTPath: "team2_round_t",
+
+  currentMapPath: "current_map",
+  mapNumberPath: "map_number",
+
+  timeLabelPath: "time_until_match"
+};
+
+const DEFAULT_RESULTS_MAPPING: MatchResponseMapping = {
+  ...DEFAULT_MATCH_MAPPING,
+  startPath: "",
+  eventPath: "tournament_name",
+  seriesPath: "round_info",
+  timeLabelPath: "time_completed"
+};
+
+/**
+ * Default configuration used on first installation.
+ *
+ * Replace the local URL with the public URL of your
+ * self-hosted API before publishing the extension.
+ *
+ * Users can still override every setting through the options page.
+ */
+export const DEFAULT_CONFIG: ExtensionConfig = {
+  baseUrl: "http://127.0.0.1:3001",
+  headers: "{}",
+
+  endpoints: {
+    upcoming: {
+      endpoint: "/v2/match?q=upcoming_extended",
+      mapping: { ...DEFAULT_MATCH_MAPPING }
+    },
+    live: {
+      endpoint: "/v2/match?q=live_score",
+      mapping: { ...DEFAULT_MATCH_MAPPING }
+    },
+    results: {
+      endpoint: "/v2/match?q=results",
+      mapping: { ...DEFAULT_RESULTS_MAPPING }
+    }
+  },
 
   // match_page is relative, for example:
   // 716636/gentle-mates-gc-vs-alternate-attax-ruby...
@@ -59,7 +101,10 @@ export const DEFAULT_CONFIG: ExtensionConfig = {
   timestampTimeZone: "UTC",
 
   // The popup opens filtered to VCT events unless the user changes this.
-  defaultMatchFilter: "vct"
+  defaultMatchFilter: "vct",
+
+  // Disabled by default; users opt in from the settings page.
+  liveNotificationsEnabled: false
 };
 
 /**
@@ -119,21 +164,13 @@ export function buildApiUrl(
   return `${base}/${route.replace(/^\/+/, "")}`;
 }
 
-type MatchQuery =
-  "upcoming" |
-  "upcoming_extended" |
-  "live_score" |
-  "results";
-
 /**
- * Reuses the configured match endpoint while replacing only the
- * query mode and optional API page. This keeps custom base URLs
- * and path prefixes intact.
+ * Adds the API page selectors used by the current VLR API while
+ * preserving every other configured endpoint detail.
  */
-export function buildMatchEndpoint(
+export function buildPagedEndpoint(
   endpoint: string,
-  query: MatchQuery,
-  page?: number
+  page: number
 ): string {
   const route = endpoint.trim();
   const isAbsolute = /^https?:\/\//i.test(route);
@@ -142,42 +179,52 @@ export function buildMatchEndpoint(
     "https://valorant-match-calendar.local"
   );
 
-  url.searchParams.set("q", query);
   url.searchParams.delete("num_pages");
   url.searchParams.delete("from_page");
   url.searchParams.delete("to_page");
 
-  if (
-    page !== undefined &&
-    (
-      query === "upcoming_extended" ||
-      query === "results"
-    )
-  ) {
-    const normalizedPage =
-      Math.min(
-        3,
-        Math.max(
-          1,
-          Math.trunc(page)
-        )
-      );
+  const normalizedPage =
+    Math.min(
+      3,
+      Math.max(
+        1,
+        Math.trunc(page)
+      )
+    );
 
-    url.searchParams.set(
-      "from_page",
-      String(normalizedPage)
-    );
-    url.searchParams.set(
-      "to_page",
-      String(normalizedPage)
-    );
-  }
+  url.searchParams.set(
+    "from_page",
+    String(normalizedPage)
+  );
+  url.searchParams.set(
+    "to_page",
+    String(normalizedPage)
+  );
 
   if (isAbsolute) {
     return url.href;
   }
 
   return `${url.pathname}${url.search}`;
+}
+
+export function buildEndpointApiUrl(
+  config: ExtensionConfig,
+  endpointKey: MatchEndpointKey,
+  page?: number
+): string {
+  const endpoint =
+    page === undefined
+      ? config.endpoints[endpointKey].endpoint
+      : buildPagedEndpoint(
+        config.endpoints[endpointKey].endpoint,
+        page
+      );
+
+  return buildApiUrl(
+    config.baseUrl,
+    endpoint
+  );
 }
 
 /**
@@ -467,6 +514,196 @@ export function createCalendarUrl(
   );
 }
 
+type LegacyConfig = Partial<ExtensionConfig> & {
+  endpoint?: unknown;
+  matchesPath?: unknown;
+  idPath?: unknown;
+  startPath?: unknown;
+  endPath?: unknown;
+  eventPath?: unknown;
+  seriesPath?: unknown;
+  team1Path?: unknown;
+  team2Path?: unknown;
+  flag1Path?: unknown;
+  flag2Path?: unknown;
+  matchUrlPath?: unknown;
+};
+
+function stringConfigValue(
+  value: unknown,
+  fallback: string
+): string {
+  return typeof value === "string"
+    ? value
+    : fallback;
+}
+
+function numberConfigValue(
+  value: unknown,
+  fallback: number
+): number {
+  return typeof value === "number" &&
+    Number.isFinite(value)
+    ? value
+    : fallback;
+}
+
+function booleanConfigValue(
+  value: unknown,
+  fallback: boolean
+): boolean {
+  return typeof value === "boolean"
+    ? value
+    : fallback;
+}
+
+function mappingFromLegacy(
+  storedConfig: LegacyConfig
+): Partial<MatchResponseMapping> {
+  const mapping: Partial<MatchResponseMapping> = {};
+
+  (
+    [
+      "matchesPath",
+      "idPath",
+      "startPath",
+      "endPath",
+      "eventPath",
+      "seriesPath",
+      "team1Path",
+      "team2Path",
+      "flag1Path",
+      "flag2Path",
+      "matchUrlPath"
+    ] as Array<keyof LegacyConfig & keyof MatchResponseMapping>
+  ).forEach(key => {
+    if (typeof storedConfig[key] === "string") {
+      mapping[key] = storedConfig[key];
+    }
+  });
+
+  return mapping;
+}
+
+function configuredEndpoint(
+  storedConfig: LegacyConfig,
+  endpointKey: MatchEndpointKey
+): string {
+  const configuredEndpoint =
+    storedConfig.endpoints?.[endpointKey]?.endpoint;
+
+  if (typeof configuredEndpoint === "string") {
+    return configuredEndpoint;
+  }
+
+  if (
+    storedConfig.endpoints === undefined &&
+    endpointKey === "upcoming" &&
+    typeof storedConfig.endpoint === "string"
+  ) {
+    return storedConfig.endpoint;
+  }
+
+  return DEFAULT_CONFIG.endpoints[endpointKey].endpoint;
+}
+
+function configuredMapping(
+  storedConfig: LegacyConfig,
+  endpointKey: MatchEndpointKey
+): MatchResponseMapping {
+  const mapping =
+    storedConfig.endpoints?.[endpointKey]?.mapping;
+
+  const legacyMapping =
+    storedConfig.endpoints === undefined &&
+      endpointKey !== "results"
+      ? mappingFromLegacy(storedConfig)
+      : {};
+
+  return {
+    ...DEFAULT_CONFIG.endpoints[endpointKey].mapping,
+    ...legacyMapping,
+    ...(
+      mapping &&
+        typeof mapping === "object" &&
+        !Array.isArray(mapping)
+        ? mapping
+        : {}
+    )
+  };
+}
+
+export function normalizeConfig(
+  storedConfig: LegacyConfig
+): ExtensionConfig {
+  const defaultFilter =
+    storedConfig.defaultMatchFilter === "all"
+      ? "all"
+      : DEFAULT_CONFIG.defaultMatchFilter;
+
+  const timestampTimeZone =
+    storedConfig.timestampTimeZone === "local"
+      ? "local"
+      : DEFAULT_CONFIG.timestampTimeZone;
+
+  return {
+    baseUrl: stringConfigValue(
+      storedConfig.baseUrl,
+      DEFAULT_CONFIG.baseUrl
+    ),
+    headers: stringConfigValue(
+      storedConfig.headers,
+      DEFAULT_CONFIG.headers
+    ),
+    endpoints: {
+      upcoming: {
+        endpoint: configuredEndpoint(
+          storedConfig,
+          "upcoming"
+        ),
+        mapping: configuredMapping(
+          storedConfig,
+          "upcoming"
+        )
+      },
+      live: {
+        endpoint: configuredEndpoint(
+          storedConfig,
+          "live"
+        ),
+        mapping: configuredMapping(
+          storedConfig,
+          "live"
+        )
+      },
+      results: {
+        endpoint: configuredEndpoint(
+          storedConfig,
+          "results"
+        ),
+        mapping: configuredMapping(
+          storedConfig,
+          "results"
+        )
+      }
+    },
+    matchPageBaseUrl: stringConfigValue(
+      storedConfig.matchPageBaseUrl,
+      DEFAULT_CONFIG.matchPageBaseUrl
+    ),
+    durationMinutes: numberConfigValue(
+      storedConfig.durationMinutes,
+      DEFAULT_CONFIG.durationMinutes
+    ),
+    timestampTimeZone,
+    defaultMatchFilter: defaultFilter,
+    liveNotificationsEnabled: booleanConfigValue(
+      storedConfig.liveNotificationsEnabled,
+      DEFAULT_CONFIG.liveNotificationsEnabled
+    )
+  };
+}
+
 /**
  * Loads configuration from Chrome sync storage.
  *
@@ -477,13 +714,12 @@ export async function loadConfig():
   Promise<ExtensionConfig> {
   const storedConfig =
     await chrome.storage.sync.get(
-      DEFAULT_CONFIG
+      null
     );
 
-  return {
-    ...DEFAULT_CONFIG,
-    ...storedConfig
-  };
+  return normalizeConfig(
+    storedConfig as LegacyConfig
+  );
 }
 
 /**
@@ -500,7 +736,7 @@ interface ApiResponseEnvelope {
 }
 
 interface FetchMatchesOptions {
-  query?: MatchQuery;
+  endpointKey?: MatchEndpointKey;
   page?: number;
   status?: MatchStatus;
   includePast?: boolean;
@@ -610,20 +846,30 @@ function firstNonEmptyString(
   return fallback;
 }
 
+function getMappedValue(
+  row: unknown,
+  path: string
+): unknown {
+  return path
+    ? getByPath(row, path)
+    : undefined;
+}
+
 function mapPayloadMatches(
   payload: unknown,
   config: ExtensionConfig,
+  mapping: MatchResponseMapping,
   status: MatchStatus
 ): Match[] {
   const rows = getByPath(
     payload,
-    config.matchesPath
+    mapping.matchesPath
   );
 
   if (!Array.isArray(rows)) {
     throw new Error(
       `The matches path ` +
-      `"${config.matchesPath}" ` +
+      `"${mapping.matchesPath}" ` +
       `did not resolve to an array.`
     );
   }
@@ -637,21 +883,21 @@ function mapPayloadMatches(
         const parsedStart =
           normalizeMatchTimestamp(
             parseDate(
-              getByPath(
+              getMappedValue(
                 row,
-                config.startPath
+                mapping.startPath
               ),
               config.timestampTimeZone
             )
           );
 
         const parsedEnd =
-          config.endPath
+          mapping.endPath
             ? normalizeMatchTimestamp(
               parseDate(
-                getByPath(
+                getMappedValue(
                   row,
-                  config.endPath
+                  mapping.endPath
                 ),
                 config.timestampTimeZone
               )
@@ -672,17 +918,17 @@ function mapPayloadMatches(
         const start = parsedStart ?? new Date();
 
         const rawMatchPage =
-          getByPath(
+          getMappedValue(
             row,
-            config.matchUrlPath
+            mapping.matchUrlPath
           );
 
         const end = parsedEnd;
 
         const rawId =
-          getByPath(
+          getMappedValue(
             row,
-            config.idPath
+            mapping.idPath
           );
 
         return {
@@ -698,55 +944,55 @@ function mapPayloadMatches(
           end,
           timeLabel: firstNonEmptyString(
             "",
-            getByPath(row, "time_completed"),
-            getByPath(row, "time_until_match")
+            getMappedValue(
+              row,
+              mapping.timeLabelPath
+            )
           ),
 
           event: firstNonEmptyString(
             "Valorant pro match",
-            getByPath(
+            getMappedValue(
               row,
-              config.eventPath
-            ),
-            getByPath(row, "tournament_name")
+              mapping.eventPath
+            )
           ),
 
           series: firstNonEmptyString(
             "",
-            getByPath(
+            getMappedValue(
               row,
-              config.seriesPath
-            ),
-            getByPath(row, "round_info")
+              mapping.seriesPath
+            )
           ),
 
           team1: firstNonEmptyString(
             "TBD",
-            getByPath(
+            getMappedValue(
               row,
-              config.team1Path
+              mapping.team1Path
             )
           ),
 
           team2: firstNonEmptyString(
             "TBD",
-            getByPath(
+            getMappedValue(
               row,
-              config.team2Path
+              mapping.team2Path
             )
           ),
 
           flag1: stringValue(
-            getByPath(
+            getMappedValue(
               row,
-              config.flag1Path
+              mapping.flag1Path
             )
           ),
 
           flag2: stringValue(
-            getByPath(
+            getMappedValue(
               row,
-              config.flag2Path
+              mapping.flag2Path
             )
           ),
 
@@ -756,35 +1002,59 @@ function mapPayloadMatches(
           ),
 
           score1: stringValue(
-            getByPath(row, "score1")
+            getMappedValue(
+              row,
+              mapping.score1Path
+            )
           ),
 
           score2: stringValue(
-            getByPath(row, "score2")
+            getMappedValue(
+              row,
+              mapping.score2Path
+            )
           ),
 
           team1RoundCt: stringValue(
-            getByPath(row, "team1_round_ct")
+            getMappedValue(
+              row,
+              mapping.team1RoundCtPath
+            )
           ),
 
           team1RoundT: stringValue(
-            getByPath(row, "team1_round_t")
+            getMappedValue(
+              row,
+              mapping.team1RoundTPath
+            )
           ),
 
           team2RoundCt: stringValue(
-            getByPath(row, "team2_round_ct")
+            getMappedValue(
+              row,
+              mapping.team2RoundCtPath
+            )
           ),
 
           team2RoundT: stringValue(
-            getByPath(row, "team2_round_t")
+            getMappedValue(
+              row,
+              mapping.team2RoundTPath
+            )
           ),
 
           currentMap: stringValue(
-            getByPath(row, "current_map")
+            getMappedValue(
+              row,
+              mapping.currentMapPath
+            )
           ),
 
           mapNumber: stringValue(
-            getByPath(row, "map_number")
+            getMappedValue(
+              row,
+              mapping.mapNumberPath
+            )
           )
         };
       }
@@ -824,31 +1094,28 @@ export async function fetchMatches(
   config: ExtensionConfig,
   options: FetchMatchesOptions = {}
 ): Promise<Match[]> {
+  const endpointKey =
+    options.endpointKey ?? "upcoming";
+  const endpointConfig =
+    config.endpoints[endpointKey];
+
   /*
    * A base URL is only optional when endpoint itself is
    * a complete URL.
    */
   if (
     !config.baseUrl &&
-    !/^https?:\/\//i.test(config.endpoint)
+    !/^https?:\/\//i.test(endpointConfig.endpoint)
   ) {
     throw new Error(
       "Configure the API base URL in Settings first."
     );
   }
 
-  const endpoint =
-    options.query
-      ? buildMatchEndpoint(
-        config.endpoint,
-        options.query,
-        options.page
-      )
-      : config.endpoint;
-
-  const url = buildApiUrl(
-    config.baseUrl,
-    endpoint
+  const url = buildEndpointApiUrl(
+    config,
+    endpointKey,
+    options.page
   );
 
   const headers =
@@ -875,6 +1142,7 @@ export async function fetchMatches(
     mapPayloadMatches(
       payload,
       config,
+      endpointConfig.mapping,
       options.status ?? "upcoming"
     );
 

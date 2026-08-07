@@ -17,8 +17,8 @@
         <label>Base URL
           <input id="baseUrl" type="url" placeholder="http://127.0.0.1:3001" required>
         </label>
-        <label>Upcoming matches endpoint
-          <input id="endpoint" type="text" placeholder="/v2/match?q=upcoming" required>
+        <label>Match-page base URL
+          <input id="matchPageBaseUrl" type="url" placeholder="https://www.vlr.gg">
         </label>
       </div>
 
@@ -26,21 +26,94 @@
         <textarea id="headers" rows="4" spellcheck="false" placeholder='{"Authorization":"Bearer YOUR_TOKEN"}'></textarea>
       </label>
 
-      <h2>Response mapping</h2>
-      <div class="mapping-grid">
-        <label>Matches array path <input id="matchesPath" placeholder="data.segments"></label>
-        <label>Match ID path <input id="idPath" placeholder="match_page"></label>
-        <label>Start timestamp path <input id="startPath" placeholder="unix_timestamp"></label>
-        <label>End timestamp path <input id="endPath" placeholder=""></label>
-        <label>Event path <input id="eventPath" placeholder="match_event"></label>
-        <label>Series path <input id="seriesPath" placeholder="match_series"></label>
-        <label>Team 1 path <input id="team1Path" placeholder="team1"></label>
-        <label>Team 2 path <input id="team2Path" placeholder="team2"></label>
-        <label>Team 1 flag path <input id="flag1Path" placeholder="flag1"></label>
-        <label>Team 2 flag path <input id="flag2Path" placeholder="flag2"></label>
-        <label>Match-page path <input id="matchUrlPath" placeholder="match_page"></label>
-        <label>Match-page base URL <input id="matchPageBaseUrl" type="url" placeholder="https://www.vlr.gg"></label>
-      </div>
+      <h2>Endpoint settings</h2>
+
+      <details open>
+        <summary>Upcoming matches endpoint</summary>
+        <label>Endpoint
+          <input id="upcoming_endpoint" type="text" placeholder="/v2/match?q=upcoming_extended" required>
+        </label>
+        <div class="mapping-grid">
+          <label>Matches array path <input id="upcoming_matchesPath" placeholder="data.segments"></label>
+          <label>Match ID path <input id="upcoming_idPath" placeholder="match_page"></label>
+          <label>Start timestamp path <input id="upcoming_startPath" placeholder="unix_timestamp"></label>
+          <label>End timestamp path <input id="upcoming_endPath" placeholder=""></label>
+          <label>Event path <input id="upcoming_eventPath" placeholder="match_event"></label>
+          <label>Series path <input id="upcoming_seriesPath" placeholder="match_series"></label>
+          <label>Team 1 path <input id="upcoming_team1Path" placeholder="team1"></label>
+          <label>Team 2 path <input id="upcoming_team2Path" placeholder="team2"></label>
+          <label>Team 1 flag path <input id="upcoming_flag1Path" placeholder="flag1"></label>
+          <label>Team 2 flag path <input id="upcoming_flag2Path" placeholder="flag2"></label>
+          <label>Match-page path <input id="upcoming_matchUrlPath" placeholder="match_page"></label>
+          <label>Score 1 path <input id="upcoming_score1Path" placeholder="score1"></label>
+          <label>Score 2 path <input id="upcoming_score2Path" placeholder="score2"></label>
+          <label>Team 1 CT rounds path <input id="upcoming_team1RoundCtPath" placeholder="team1_round_ct"></label>
+          <label>Team 1 T rounds path <input id="upcoming_team1RoundTPath" placeholder="team1_round_t"></label>
+          <label>Team 2 CT rounds path <input id="upcoming_team2RoundCtPath" placeholder="team2_round_ct"></label>
+          <label>Team 2 T rounds path <input id="upcoming_team2RoundTPath" placeholder="team2_round_t"></label>
+          <label>Current map path <input id="upcoming_currentMapPath" placeholder="current_map"></label>
+          <label>Map number path <input id="upcoming_mapNumberPath" placeholder="map_number"></label>
+          <label>Time label path <input id="upcoming_timeLabelPath" placeholder="time_until_match"></label>
+        </div>
+      </details>
+
+      <details>
+        <summary>Live matches endpoint</summary>
+        <label>Endpoint
+          <input id="live_endpoint" type="text" placeholder="/v2/match?q=live_score" required>
+        </label>
+        <div class="mapping-grid">
+          <label>Matches array path <input id="live_matchesPath" placeholder="data.segments"></label>
+          <label>Match ID path <input id="live_idPath" placeholder="match_page"></label>
+          <label>Start timestamp path <input id="live_startPath" placeholder="unix_timestamp"></label>
+          <label>End timestamp path <input id="live_endPath" placeholder=""></label>
+          <label>Event path <input id="live_eventPath" placeholder="match_event"></label>
+          <label>Series path <input id="live_seriesPath" placeholder="match_series"></label>
+          <label>Team 1 path <input id="live_team1Path" placeholder="team1"></label>
+          <label>Team 2 path <input id="live_team2Path" placeholder="team2"></label>
+          <label>Team 1 flag path <input id="live_flag1Path" placeholder="flag1"></label>
+          <label>Team 2 flag path <input id="live_flag2Path" placeholder="flag2"></label>
+          <label>Match-page path <input id="live_matchUrlPath" placeholder="match_page"></label>
+          <label>Score 1 path <input id="live_score1Path" placeholder="score1"></label>
+          <label>Score 2 path <input id="live_score2Path" placeholder="score2"></label>
+          <label>Team 1 CT rounds path <input id="live_team1RoundCtPath" placeholder="team1_round_ct"></label>
+          <label>Team 1 T rounds path <input id="live_team1RoundTPath" placeholder="team1_round_t"></label>
+          <label>Team 2 CT rounds path <input id="live_team2RoundCtPath" placeholder="team2_round_ct"></label>
+          <label>Team 2 T rounds path <input id="live_team2RoundTPath" placeholder="team2_round_t"></label>
+          <label>Current map path <input id="live_currentMapPath" placeholder="current_map"></label>
+          <label>Map number path <input id="live_mapNumberPath" placeholder="map_number"></label>
+          <label>Time label path <input id="live_timeLabelPath" placeholder="time_until_match"></label>
+        </div>
+      </details>
+
+      <details>
+        <summary>Results endpoint</summary>
+        <label>Endpoint
+          <input id="results_endpoint" type="text" placeholder="/v2/match?q=results" required>
+        </label>
+        <div class="mapping-grid">
+          <label>Matches array path <input id="results_matchesPath" placeholder="data.segments"></label>
+          <label>Match ID path <input id="results_idPath" placeholder="match_page"></label>
+          <label>Start timestamp path <input id="results_startPath" placeholder=""></label>
+          <label>End timestamp path <input id="results_endPath" placeholder=""></label>
+          <label>Event path <input id="results_eventPath" placeholder="tournament_name"></label>
+          <label>Series path <input id="results_seriesPath" placeholder="round_info"></label>
+          <label>Team 1 path <input id="results_team1Path" placeholder="team1"></label>
+          <label>Team 2 path <input id="results_team2Path" placeholder="team2"></label>
+          <label>Team 1 flag path <input id="results_flag1Path" placeholder="flag1"></label>
+          <label>Team 2 flag path <input id="results_flag2Path" placeholder="flag2"></label>
+          <label>Match-page path <input id="results_matchUrlPath" placeholder="match_page"></label>
+          <label>Score 1 path <input id="results_score1Path" placeholder="score1"></label>
+          <label>Score 2 path <input id="results_score2Path" placeholder="score2"></label>
+          <label>Team 1 CT rounds path <input id="results_team1RoundCtPath" placeholder="team1_round_ct"></label>
+          <label>Team 1 T rounds path <input id="results_team1RoundTPath" placeholder="team1_round_t"></label>
+          <label>Team 2 CT rounds path <input id="results_team2RoundCtPath" placeholder="team2_round_ct"></label>
+          <label>Team 2 T rounds path <input id="results_team2RoundTPath" placeholder="team2_round_t"></label>
+          <label>Current map path <input id="results_currentMapPath" placeholder="current_map"></label>
+          <label>Map number path <input id="results_mapNumberPath" placeholder="map_number"></label>
+          <label>Time label path <input id="results_timeLabelPath" placeholder="time_completed"></label>
+        </div>
+      </details>
 
       <div class="two-column">
         <label>Default duration when no end time exists (minutes)
@@ -62,6 +135,10 @@
             <option value="all">All</option>
           </select>
         </label>
+        <label class="checkbox-label">
+          <input id="liveNotificationsEnabled" type="checkbox">
+          Notify when a new live game appears
+        </label>
       </div>
 
       <div class="form-actions">
@@ -71,26 +148,6 @@
       </div>
       <p id="saveStatus" class="status" role="status"></p>
     </form>
-
-    <details>
-      <summary>Expected response shape</summary>
-      <pre>{
-  "status": "success",
-  "data": {
-    "status": 200,
-    "segments": [{
-      "team1": "Gentle Mates GC",
-      "team2": "ALTERNATE aTTaX Ruby",
-      "flag1": "flag_eu",
-      "flag2": "flag_de",
-      "match_series": "Group Stage: Week 3",
-      "match_event": "Game Changers 2026: EMEA Stage 3",
-      "unix_timestamp": "2026-08-06 18:00:00",
-      "match_page": "716636/example-match"
-    }]
-  }
-}</pre>
-    </details>
   </main>
   <script src="dist/options.js"></script>
 </body>

@@ -1,4 +1,12 @@
-import { createCalendarUrl, fetchMatches, loadConfig } from "./common";
+import {
+  createCalendarUrl,
+  fetchMatches,
+  loadActiveMatchFilter,
+  loadConfig,
+  matchPassesFilter,
+  normalizeMatchFilter,
+  saveActiveMatchFilter
+} from "./common";
 import type {
   ExtensionConfig,
   Match,
@@ -56,11 +64,13 @@ resultsViewButton.addEventListener("click", () => {
 
 vctFilterButton.addEventListener("click", () => {
   selectedFilter = "vct";
+  void saveActiveMatchFilter(selectedFilter);
   void renderMatches();
 });
 
 allFilterButton.addEventListener("click", () => {
   selectedFilter = "all";
+  void saveActiveMatchFilter(selectedFilter);
   void renderMatches();
 });
 
@@ -76,10 +86,6 @@ pageButtons.forEach(button => {
 
 function activeFilter(): MatchFilter {
   return selectedFilter ?? "vct";
-}
-
-function normalizeFilter(filter: string): MatchFilter {
-  return filter === "all" ? "all" : "vct";
 }
 
 function updateControls(): void {
@@ -501,7 +507,9 @@ function filterMatches(matches: Match[]): Match[] {
     return matches;
   }
 
-  return matches.filter(match => /\bvct\b/i.test(match.event));
+  return matches.filter(match =>
+    matchPassesFilter(match, activeFilter())
+  );
 }
 
 function statusText(count: number): string {
@@ -535,7 +543,9 @@ async function renderMatches(): Promise<void> {
 
   try {
     const config = await loadConfig();
-    selectedFilter ??= normalizeFilter(config.defaultMatchFilter);
+    selectedFilter ??= normalizeMatchFilter(
+      await loadActiveMatchFilter(config)
+    );
     updateControls();
 
     const matches = filterMatches(

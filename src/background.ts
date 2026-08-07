@@ -1,10 +1,17 @@
-import { fetchMatches, loadConfig } from "./common";
+import {
+  ACTIVE_MATCH_FILTER_KEY,
+  fetchMatches,
+  loadActiveMatchFilter,
+  loadConfig,
+  matchPassesFilter
+} from "./common";
 import type { Match } from "./types";
 
 const LIVE_ALARM_NAME = "valorant-live-match-check";
 const CHECK_PERIOD_MINUTES = 5;
 const NOTIFIED_IDS_KEY = "notifiedLiveMatchIds";
 const NOTIFICATION_URLS_KEY = "liveNotificationUrls";
+const NOTIFICATION_ICON_URL = chrome.runtime.getURL("icons/icon128.png");
 
 function notificationId(match: Match): string {
   return `live-${String(match.id).replace(/[^a-z0-9_-]/gi, "_")}`;
@@ -51,8 +58,10 @@ async function saveNotificationUrl(
   });
 }
 
-async function notifyLiveMatch(match: Match): Promise<void> {
-  const id = notificationId(match);
+async function notifyLiveMatch(
+  match: Match,
+  id = notificationId(match)
+): Promise<void> {
   const score =
     match.score1 || match.score2
       ? ` (${match.score1 || "0"}-${match.score2 || "0"})`
@@ -60,7 +69,7 @@ async function notifyLiveMatch(match: Match): Promise<void> {
 
   await chrome.notifications.create(id, {
     type: "basic",
-    iconUrl: "icons/icon128.png",
+    iconUrl: NOTIFICATION_ICON_URL,
     title: "Valorant match is live",
     message: `${match.team1} vs ${match.team2}${score}`,
     contextMessage: match.event || undefined,
@@ -68,6 +77,41 @@ async function notifyLiveMatch(match: Match): Promise<void> {
   });
 
   await saveNotificationUrl(id, match.url);
+}
+
+async function testNotification(): Promise<string> {
+  const config = await loadConfig();
+  const filter = await loadActiveMatchFilter(config);
+  const liveMatches = await fetchMatches(config, {
+    endpointKey: "live",
+    status: "live",
+    includePast: true,
+    sort: "api"
+  });
+  const match = liveMatches.find(liveMatch =>
+    matchPassesFilter(liveMatch, filter)
+  );
+
+  if (match) {
+    await notifyLiveMatch(
+      match,
+      `test-${notificationId(match)}-${Date.now()}`
+    );
+
+    return `Test notification sent for ${match.team1} vs ${match.team2}.`;
+  }
+
+  await chrome.notifications.create(`test-live-${Date.now()}`, {
+    type: "basic",
+    iconUrl: NOTIFICATION_ICON_URL,
+    title: "Valorant notification test",
+    message: filter === "vct"
+      ? "Notifications are working. No live VCT match is currently available."
+      : "Notifications are working. No live match is currently available.",
+    priority: 1
+  });
+
+  return "Test notification sent.";
 }
 
 async function checkLiveMatches(): Promise<void> {
@@ -83,10 +127,15 @@ async function checkLiveMatches(): Promise<void> {
     includePast: true,
     sort: "api"
   });
+  const filter = await loadActiveMatchFilter(config);
   const notified = await notifiedIds();
   let changed = false;
 
   for (const match of liveMatches) {
+    if (!matchPassesFilter(match, filter)) {
+      continue;
+    }
+
     const key = matchKey(match);
 
     if (notified.has(key)) {
@@ -138,15 +187,24 @@ chrome.runtime.onStartup.addListener(() => {
 });
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
-  if (areaName !== "sync") return;
+  if (areaName === "sync") {
+    if (
+      "liveNotificationsEnabled" in changes ||
+      "endpoints" in changes ||
+      "baseUrl" in changes ||
+      "headers" in changes
+    ) {
+      runAlarmSync();
+    }
+
+    return;
+  }
 
   if (
-    "liveNotificationsEnabled" in changes ||
-    "endpoints" in changes ||
-    "baseUrl" in changes ||
-    "headers" in changes
+    areaName === "local" &&
+    ACTIVE_MATCH_FILTER_KEY in changes
   ) {
-    runAlarmSync();
+    runLiveCheck();
   }
 });
 
@@ -171,4 +229,30 @@ chrome.notifications.onClicked.addListener(notificationId => {
       await chrome.tabs.create({ url });
     }
   })();
+});
+
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (
+    !message ||
+    typeof message !== "object" ||
+    (message as { type?: unknown }).type !== "test-live-notification"
+  ) {
+    return false;
+  }
+
+  void testNotification()
+    .then(result => {
+      sendResponse({
+        ok: true,
+        message: result
+      });
+    })
+    .catch((error: unknown) => {
+      sendResponse({
+        ok: false,
+        message: error instanceof Error ? error.message : "Unexpected error."
+      });
+    });
+
+  return true;
 });

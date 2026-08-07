@@ -4,7 +4,8 @@ import {
   buildEndpointApiUrl,
   fetchMatches,
   loadConfig,
-  originPermissionPattern
+  originPermissionPattern,
+  saveActiveMatchFilter
 } from "./common";
 import type {
   ExtensionConfig,
@@ -40,6 +41,7 @@ const mappingFields: Array<keyof MatchResponseMapping> = [
 const form = document.querySelector<HTMLFormElement>("#settingsForm")!;
 const saveStatus = document.querySelector<HTMLElement>("#saveStatus")!;
 const testButton = document.querySelector<HTMLButtonElement>("#testButton")!;
+const testNotificationButton = document.querySelector<HTMLButtonElement>("#testNotificationButton")!;
 const restoreDefaultsButton = document.querySelector<HTMLButtonElement>("#restoreDefaultsButton")!;
 
 function requiredElement<T extends Element>(selector: string): T {
@@ -188,6 +190,20 @@ function validateConfig(config: ExtensionConfig): void {
   }
 }
 
+interface TestNotificationResponse {
+  ok: boolean;
+  message: string;
+}
+
+async function saveConfigForTest(
+  config: ExtensionConfig
+): Promise<void> {
+  validateConfig(config);
+  await ensureApiPermission(config);
+  await chrome.storage.sync.set(config);
+  await saveActiveMatchFilter(config.defaultMatchFilter);
+}
+
 form.addEventListener("submit", event => {
   event.preventDefault();
   void (async () => {
@@ -195,10 +211,37 @@ form.addEventListener("submit", event => {
 
     try {
       const config = readForm();
-      validateConfig(config);
-      await ensureApiPermission(config);
-      await chrome.storage.sync.set(config);
+      await saveConfigForTest(config);
       setStatus("Settings saved.");
+    } catch (error: unknown) {
+      setStatus(
+        error instanceof Error ? error.message : "Unexpected error.",
+        true
+      );
+    }
+  })();
+});
+
+testNotificationButton.addEventListener("click", () => {
+  void (async () => {
+    setStatus("Sending test notification...");
+
+    try {
+      const config = readForm();
+      await saveConfigForTest(config);
+
+      const response =
+        await chrome.runtime.sendMessage({
+          type: "test-live-notification"
+        }) as TestNotificationResponse;
+
+      if (!response?.ok) {
+        throw new Error(
+          response?.message || "Test notification failed."
+        );
+      }
+
+      setStatus(response.message);
     } catch (error: unknown) {
       setStatus(
         error instanceof Error ? error.message : "Unexpected error.",

@@ -1,10 +1,13 @@
 import type {
   ExtensionConfig,
+  MatchFilter,
   MatchEndpointKey,
   MatchResponseMapping,
   Match,
   MatchStatus
 } from "./types";
+
+export const ACTIVE_MATCH_FILTER_KEY = "activeMatchFilter";
 
 export const MATCH_ENDPOINT_KEYS: MatchEndpointKey[] = [
   "upcoming",
@@ -720,6 +723,40 @@ export async function loadConfig():
   return normalizeConfig(
     storedConfig as LegacyConfig
   );
+}
+
+export function normalizeMatchFilter(
+  filter: unknown
+): MatchFilter {
+  return filter === "all" ? "all" : "vct";
+}
+
+export function matchPassesFilter(
+  match: Match,
+  filter: MatchFilter
+): boolean {
+  return filter === "all" || /\bvct\b/i.test(match.event);
+}
+
+export async function loadActiveMatchFilter(
+  config: ExtensionConfig
+): Promise<MatchFilter> {
+  const stored = await chrome.storage.local.get(
+    ACTIVE_MATCH_FILTER_KEY
+  );
+
+  return normalizeMatchFilter(
+    stored[ACTIVE_MATCH_FILTER_KEY] ??
+      config.defaultMatchFilter
+  );
+}
+
+export async function saveActiveMatchFilter(
+  filter: MatchFilter
+): Promise<void> {
+  await chrome.storage.local.set({
+    [ACTIVE_MATCH_FILTER_KEY]: filter
+  });
 }
 
 /**
